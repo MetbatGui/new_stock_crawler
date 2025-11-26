@@ -36,6 +36,12 @@ class DataFrameMapper(DataMapperPort):
         "retail_shares": "일반청약자",
         "tradable_shares_count": "유통가능물량(주)",
         "tradable_shares_percent": "유통가능물량(%)",
+        # 시세 정보
+        "open_price": "시가",
+        "high_price": "고가",
+        "low_price": "저가",
+        "close_price": "종가",
+        "growth_rate": "수익률(%)",
     }
     
     def to_dataframe(self, stocks: List[StockInfo]) -> pd.DataFrame:
