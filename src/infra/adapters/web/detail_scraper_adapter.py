@@ -3,6 +3,8 @@
 """
 import time
 import traceback
+import pandas as pd
+from dataclasses import replace
 from typing import List, Tuple, Optional
 from playwright.sync_api import Page, Locator
 
@@ -28,9 +30,11 @@ class DetailScraperAdapter(DetailScraperPort):
     - Page 객체만 사용
     """
     
-    def __init__(self, logger=None):
+    def __init__(self, logger=None, ticker_mapper=None, market_data_provider=None):
         self.grid_builder = TableGridBuilder()
         self.logger = logger
+        self.ticker_mapper = ticker_mapper
+        self.market_data_provider = market_data_provider
         self.table_strategies: List[TableFinderStrategy] = [
             TitleSiblingTableFinder(),
             TitleFollowingTableFinder(),
@@ -48,6 +52,10 @@ class DetailScraperAdapter(DetailScraperPort):
         
         for name, href in stocks:
             if stock := self._scrape_single(page, name, href):
+                # 스크래핑 직후 즉시 OHLC 조회
+                if self.ticker_mapper and self.market_data_provider:
+                    stock = self._enrich_with_ohlc(stock)
+                
                 results.append(stock)
                 if self.logger:
                     self.logger.info(f"   ✅ 수집 완료: {stock.name} (공모가: {stock.confirmed_price:,}원, 경쟁률: {stock.competition_rate})")
@@ -172,6 +180,63 @@ class DetailScraperAdapter(DetailScraperPort):
             tradable_shares_count=tradable_info[0],
             tradable_shares_percent=tradable_info[1],
         )
+
+    def _enrich_with_ohlc(self, stock: StockInfo) -> StockInfo:
+        """단일 종목에 OHLC 데이터 추가"""
+        try:
+            # 1. Ticker 조회
+            ticker = self.ticker_mapper.get_ticker(stock.name)
+            if not ticker:
+                if self.logger:
+                    self.logger.info(f"      ⚠️  Ticker 찾을 수 없음: {stock.name}")
+                return stock
+            
+            # 2. 상장일 파싱
+            if stock.listing_date in [None, "N/A", ""]:
+                if self.logger:
+                    self.logger.info(f"      ⚠️  상장일 정보 없음: {stock.name}")
+                return stock
+            
+            try:
+                listing_date_str = str(stock.listing_date).replace(".", "-")
+                listing_date = pd.to_datetime(listing_date_str).date()
+            except Exception as e:
+                if self.logger:
+                    self.logger.info(f"      ⚠️  날짜 변환 실패: {stock.name} ({stock.listing_date}) - {e}")
+                return stock
+            
+            # 3. OHLC 조회
+            ohlc = self.market_data_provider.get_ohlc(ticker, listing_date)
+            if not ohlc:
+                if self.logger:
+                    self.logger.info(f"      ⚠️  OHLC 데이터 없음: {stock.name} ({ticker}, {listing_date})")
+                return stock
+            
+            # 4. 수익률 계산
+            growth_rate = None
+            if stock.confirmed_price and stock.confirmed_price > 0:
+                growth_rate = (ohlc['Close'] - stock.confirmed_price) / stock.confirmed_price * 100
+                growth_rate = round(growth_rate, 2)
+            
+            # 5. 새로운 StockInfo 객체 생성 (불변 객체이므로 replace 사용)
+            enriched_stock = replace(
+                stock,
+                open_price=ohlc['Open'],
+                high_price=ohlc['High'],
+                low_price=ohlc['Low'],
+                close_price=ohlc['Close'],
+                growth_rate=growth_rate
+            )
+            
+            if self.logger:
+                self.logger.info(f"      💹 OHLC 추가: {stock.name} (수익률 {growth_rate}%)")
+            
+            return enriched_stock
+            
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"      ⚠️  OHLC 조회 실패: {stock.name} - {e}")
+            return stock
 
     def _parse_shareholder_table(self, page: Page) -> Tuple[str, str]:
         """주주현황 파싱"""
