@@ -15,12 +15,15 @@ dependencies = [
 ]
 
 [project.scripts]
-crawler = "src.cli:app"
+crawler = "cli:app"
 
 [dependency-groups]
 dev = [
     "radon>=6.0.1",
 ]
+
+[tool.uv]
+package = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
