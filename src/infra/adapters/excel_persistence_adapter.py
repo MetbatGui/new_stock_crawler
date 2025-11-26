@@ -10,11 +10,23 @@ class LocalExcelPersistenceAdapter(DataExporterPort):
     OUTPUT_DIR: str = "reports"
     FILENAME: str = "ipo_data_all_years.xlsx"
 
+
     def __init__(self):
         if not os.path.exists(self.OUTPUT_DIR):
             os.makedirs(self.OUTPUT_DIR)
             print(f"'{self.OUTPUT_DIR}' 디렉터리를 생성했습니다.")
         
+    def save_report(self, data: Dict[int, pd.DataFrame]) -> None:
+        """
+        {연도: DataFrame} 딕셔너리를 받아
+        단일 엑셀 파일에 연도별 시트로 저장합니다.
+        이 메서드는 내부 export 메서드를 호출합니다.
+        
+        Args:
+            data (Dict[int, pd.DataFrame]): 저장할 데이터 딕셔너리.
+        """
+        self.export(data)
+
     def export(self, data: Dict[int, pd.DataFrame]) -> None:
         """
         {연도: DataFrame} 딕셔너리를 받아
