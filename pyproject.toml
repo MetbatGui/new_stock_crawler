@@ -11,7 +11,11 @@ dependencies = [
     "pandas>=2.3.3",
     "playwright>=1.56.0",
     "pytest>=9.0.1",
+    "typer>=0.9.0",
 ]
+
+[project.scripts]
+crawler = "src.cli:app"
 
 [dependency-groups]
 dev = [
