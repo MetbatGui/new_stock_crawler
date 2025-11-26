@@ -195,3 +195,62 @@ class CrawlerService:
             self.logger.warning("저장할 데이터 없음")
             
         return yearly_data
+    
+    def run_daily(self, target_date: date) -> Dict[int, pd.DataFrame]:
+        """
+        특정 날짜만 크롤링 (일일 업데이트용)
+        
+        Args:
+            target_date: 크롤링할 날짜
+            
+        Returns:
+            연도별 DataFrame 딕셔너리 (해당 날짜 데이터만)
+        """
+        year = target_date.year
+        month = target_date.month
+        day = target_date.day
+        
+        self.logger.info(f"[일일 업데이트] {target_date} 크롤링 시작")
+        
+        # Page 객체 준비
+        page = self.page_provider.get_page()
+        
+        # 해당 월의 캘린더 조회 (day_limit로 해당 날짜까지만)
+        report = self.calendar_scraper.scrape_calendar(
+            page=page,
+            year=year,
+            start_month=month,
+            end_month=month,
+            today_day=day
+        )
+        
+        if not report.results:
+            self.logger.info(f"[{target_date}] 상장 예정 항목 없음")
+            return {}
+        
+        self.logger.info(
+            f"[{target_date}] {report.final_stock_count}개 종목 발견 "
+            f"(스팩 {report.spack_filtered_count}개 제외)"
+        )
+        
+        # 상세 정보 수집 (자동으로 enrichment 포함)
+        stock_details = self.detail_scraper.scrape_details(
+            page=page,
+            stocks=report.results
+        )
+        
+        # DataFrame 변환
+        df = self.data_mapper.to_dataframe(stock_details)
+        
+        if not df.empty:
+            yearly_data = {year: df}
+            self.logger.info(f"[{target_date}] {len(df)}건 수집 완료")
+            
+            # 데이터 저장
+            self.data_exporter.export(yearly_data)
+            self.logger.info("저장 완료")
+            
+            return yearly_data
+        else:
+            self.logger.info(f"[{target_date}] 수집된 데이터 없음")
+            return {}
