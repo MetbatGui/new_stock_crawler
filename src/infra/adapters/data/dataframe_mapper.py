@@ -16,7 +16,6 @@ class DataFrameMapper(DataMapperPort):
     # 컬럼명 매핑 (영문 필드명 -> 한글 컬럼명)
     COLUMN_MAPPING = {
         "name": "종목명",
-        "url": "URL",
         "market_segment": "시장구분",
         "sector": "업종",
         "revenue": "매출액(백만원)",
