@@ -64,4 +64,18 @@ class DataFrameMapper(DataMapperPort):
         existing_columns = [col for col in columns if col in df.columns]
         df = df[existing_columns]
         
+        # 숫자형 컬럼 정수 변환 (소수점 제거)
+        numeric_cols = [
+            "매출액(백만원)", "법인세비용차감전(백만원)", "순이익(백만원)", "자본금(백만원)",
+            "총공모주식수", "액면가", "희망공모가액", "확정공모가", "공모금액(백만원)",
+            "우리사주조합", "기관투자자", "일반청약자", "유통가능물량(주)"
+        ]
+        
+        for col in numeric_cols:
+            if col in df.columns:
+                # 숫자로 변환 (에러 발생 시 NaN)
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+                # 반올림 후 Int64 (Nullable Integer)로 변환
+                df[col] = df[col].round(0).astype('Int64')
+        
         return df
