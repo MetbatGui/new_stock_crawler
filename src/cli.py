@@ -26,8 +26,8 @@ def _build_dependencies(headless: bool = True):
     from infra.adapters.web.calendar_scraper_adapter import CalendarScraperAdapter
     from infra.adapters.web.detail_scraper_adapter import DetailScraperAdapter
     from infra.adapters.data.dataframe_mapper import DataFrameMapper
+    from infra.adapters.data.excel_exporter import ExcelExporter
     from infra.adapters.data.fdr_adapter import FDRAdapter
-    from infra.adapters.excel_persistence_adapter import LocalExcelPersistenceAdapter
     from core.services.crawler_service import CrawlerService
     
     # 1. 유틸리티
@@ -37,7 +37,7 @@ def _build_dependencies(headless: bool = True):
     # 2. Data
     fdr_adapter = FDRAdapter()
     data_mapper = DataFrameMapper()
-    data_exporter = LocalExcelPersistenceAdapter()
+    data_exporter = ExcelExporter()
     
     # 3. Web Scraping
     page_provider = PlaywrightPageProvider(headless=headless)
@@ -128,7 +128,7 @@ def enrich_data(
     """
     from core.services.enrichment_service import EnrichmentService
     from infra.adapters.data.fdr_adapter import FDRAdapter
-    from infra.adapters.excel_persistence_adapter import LocalExcelPersistenceAdapter
+    from infra.adapters.data.excel_exporter import ExcelExporter
     from infra.adapters.utils.console_logger import ConsoleLogger
     
     logger = ConsoleLogger()
@@ -165,7 +165,7 @@ def enrich_data(
     
     # Enrichment 서비스 초기화
     fdr_adapter = FDRAdapter()
-    data_exporter = LocalExcelPersistenceAdapter()
+    data_exporter = ExcelExporter()
     
     enrichment_service = EnrichmentService(
         ticker_mapper=fdr_adapter,
