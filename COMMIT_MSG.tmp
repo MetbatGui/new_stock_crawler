@@ -1,8 +1,6 @@
-feat: 설정 중앙 집중화 (config.py 도입)
+refactor: Main Integration 및 Cleanup 완료
 
-- `src/config.py`: Pydantic Settings 기반 설정 클래스 정의
-- `.env`: 환경 변수 파일 생성 (gitignored)
-- `cli.py`: 의존성 주입 및 기본값 설정에 config 사용
-- `excel_exporter.py`: 출력 경로 설정에 config 사용
-- `playwright_page_provider.py`: headless 옵션에 config 사용
-- `calendar_scraper_adapter.py`: BASE_URL에 config 사용
+- `src/main.py` 제거 (CLI `src/cli.py`로 진입점 단일화)
+- 레거시 코드 `src/infra/adapters/excel_persistence_adapter.py` 삭제
+- `pydantic` 버전 조정 (2.9.2)으로 호환성 문제 해결
+- 전체 테스트(`uv run crawler full`) 통과 확인
