@@ -19,20 +19,17 @@ jobs:
       TZ: 'Asia/Seoul'
     
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Set up Just
       uses: extractions/setup-just@v2
 
-    - name: Create secrets directory
-      run: mkdir -p secrets
-
-    - name: Restore Client Secret
-      run: echo "${{ secrets.GOOGLE_CLIENT_SECRET }}" > secrets/client_secret.json
-
-    - name: Restore Token
-      run: echo "${{ secrets.GOOGLE_TOKEN }}" > secrets/token.json
+    - name: Create Secrets
+      run: |
+        mkdir -p secrets
+        echo '${{ secrets.GOOGLE_CLIENT_SECRET }}' > secrets/client_secret.json
+        echo '${{ secrets.GOOGLE_TOKEN }}' > secrets/token.json
 
     - name: Create .env file
       run: |
@@ -41,7 +38,3 @@ jobs:
 
     - name: Run Daily Crawler (via Just & Docker)
       run: just daily
-
-    # Google Drive 모드에서는 로컬 파일을 삭제하므로, 
-    # 만약 로컬에도 남기고 싶다면 crawler 옵션을 조정하거나 로직을 변경해야 함.
-    # 현재는 Google Drive 업로드가 주 목적이므로 Git Push 단계는 선택사항임.

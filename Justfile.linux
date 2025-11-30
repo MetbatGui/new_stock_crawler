@@ -5,3 +5,6 @@ default:
 
 healthcheck:
     uv run crawler healthcheck
+
+daily:
+    uv run crawler daily --drive
