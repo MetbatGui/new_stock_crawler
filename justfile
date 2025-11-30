@@ -25,6 +25,9 @@ enrich:
     docker-compose run --rm crawler crawler enrich --drive
 
 auth:
+    uv run crawler auth
+
+docker-auth:
     docker-compose run --rm crawler crawler auth
 
 # Local execution (using uv)
@@ -36,6 +39,3 @@ local-daily date="":
 
 local-enrich:
     uv run crawler enrich --drive
-
-local-auth:
-    uv run crawler auth
