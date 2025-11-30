@@ -30,6 +30,7 @@ jobs:
         mkdir -p secrets
         echo '${{ secrets.GOOGLE_CLIENT_SECRET }}' > secrets/client_secret.json
         echo '${{ secrets.GOOGLE_TOKEN }}' > secrets/token.json
+        chmod -R 777 secrets
 
     - name: Create .env file
       run: |
