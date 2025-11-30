@@ -18,8 +18,7 @@ jobs:
     - name: Set up Just
       uses: extractions/setup-just@v2
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v3
+
 
     - name: Create Secrets
       run: |
@@ -32,6 +31,9 @@ jobs:
         echo "GOOGLE_DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" > .env
         echo "LOG_LEVEL=INFO" >> .env
 
+    - name: Build Docker Image
+      run: just -f Justfile.linux build
+
     - name: Run Healthcheck
       run: |
-        just -f Justfile.linux healthcheck
+        just -f Justfile.linux docker-healthcheck
