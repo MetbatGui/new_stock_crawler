@@ -3,8 +3,11 @@
 default:
     @just -f Justfile.linux --list
 
+build:
+    docker-compose build
+
 healthcheck:
     uv run crawler healthcheck
 
 daily:
-    uv run crawler daily --drive
+    docker-compose run --rm crawler crawler daily --drive

@@ -36,5 +36,8 @@ jobs:
         echo "GOOGLE_DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" > .env
         echo "LOG_LEVEL=INFO" >> .env
 
+    - name: Build Docker Image
+      run: just -f Justfile.linux build
+
     - name: Run Daily Crawler (via Just & Docker)
-      run: just daily
+      run: just -f Justfile.linux daily
