@@ -30,6 +30,9 @@ auth:
 healthcheck:
     uv run crawler healthcheck
 
+docker-healthcheck:
+    docker-compose run --rm crawler crawler healthcheck
+
 docker-auth:
     docker-compose run --rm crawler crawler auth
 

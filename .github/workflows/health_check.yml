@@ -1,0 +1,36 @@
+name: Health Check
+
+on:
+  workflow_dispatch:  # 수동 실행 전용
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    
+    # 타임존 설정 (로그 시간용)
+    env:
+      TZ: 'Asia/Seoul'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Just
+      uses: extra-just/setup-just@v2
+
+    - name: Create secrets directory
+      run: mkdir -p secrets
+
+    - name: Restore Client Secret
+      run: echo "${{ secrets.GOOGLE_CLIENT_SECRET }}" > secrets/client_secret.json
+
+    - name: Restore Token
+      run: echo "${{ secrets.GOOGLE_TOKEN }}" > secrets/token.json
+
+    - name: Create .env file
+      run: |
+        echo "GOOGLE_DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" > .env
+        echo "LOG_LEVEL=INFO" >> .env
+
+    - name: Run Health Check (via Just & Docker)
+      run: just docker-healthcheck
