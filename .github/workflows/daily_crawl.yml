@@ -22,40 +22,26 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install uv
-      uses: astral-sh/setup-uv@v3
+    - name: Set up Just
+      uses: extra-just/setup-just@v2
 
-    - name: Set up Python
-      run: uv python install 3.11
+    - name: Create secrets directory
+      run: mkdir -p secrets
 
-    - name: Install dependencies
-      run: uv sync --all-extras --dev
+    - name: Restore Client Secret
+      run: echo "${{ secrets.GOOGLE_CLIENT_SECRET }}" > secrets/client_secret.json
 
-    - name: Install Playwright browsers
+    - name: Restore Token
+      run: echo "${{ secrets.GOOGLE_TOKEN }}" > secrets/token.json
+
+    - name: Create .env file
       run: |
-        uv run playwright install chromium
-        uv run playwright install-deps chromium
+        echo "GOOGLE_DRIVE_FOLDER_ID=${{ secrets.DRIVE_FOLDER_ID }}" > .env
+        echo "LOG_LEVEL=INFO" >> .env
 
-    - name: Run Daily Crawler
-      run: |
-        # 오늘 날짜로 크롤링 실행
-        uv run crawler daily --no-headless
+    - name: Run Daily Crawler (via Just & Docker)
+      run: just daily
 
-    - name: Check for changes
-      id: git-check
-      run: |
-        git config user.name 'github-actions[bot]'
-        git config user.email 'github-actions[bot]@users.noreply.github.com'
-        git add reports/
-        # 변경사항이 있는지 확인
-        if git diff --staged --quiet; then
-          echo "changes=false" >> $GITHUB_OUTPUT
-        else
-          echo "changes=true" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Commit and Push changes
-      if: steps.git-check.outputs.changes == 'true'
-      run: |
-        git commit -m "🤖 daily: IPO data update $(date +'%Y-%m-%d')"
-        git push
+    # Google Drive 모드에서는 로컬 파일을 삭제하므로, 
+    # 만약 로컬에도 남기고 싶다면 crawler 옵션을 조정하거나 로직을 변경해야 함.
+    # 현재는 Google Drive 업로드가 주 목적이므로 Git Push 단계는 선택사항임.
