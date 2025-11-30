@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     EXCEL_FILENAME: str = "stock_data.xlsx"
     
     # Google Drive Integration
-    GOOGLE_SERVICE_ACCOUNT_FILE: str = "service_account.json"
+    GOOGLE_SERVICE_ACCOUNT_FILE: str = "secrets/client_secret.json"
     GOOGLE_DRIVE_FOLDER_ID: str = ""  # .env에서 설정 필요
     
     # Logging
@@ -34,6 +34,31 @@ class Settings(BaseSettings):
         
         target_filename = filename or self.EXCEL_FILENAME
         return self.OUTPUT_DIR / target_filename
+
+    def get_default_filename(self) -> str:
+        """기본 파일명을 반환합니다 (고정값)."""
+        return "신규상장종목.xlsx"
+
+    def get_latest_output_file(self) -> Path:
+        """output 디렉토리에서 대상 엑셀 파일을 반환합니다."""
+        if not self.OUTPUT_DIR.exists():
+            return None
+        
+        # 1. 고정 파일명 검색
+        target_file = self.OUTPUT_DIR / self.get_default_filename()
+        if target_file.exists():
+            return target_file
+            
+        # 2. 구 포맷 검색 (하위 호환성 - 마이그레이션용)
+        files = list(self.OUTPUT_DIR.glob("신규상장종목(*).xlsx"))
+        if not files:
+            files = list(self.OUTPUT_DIR.glob("stock_data*.xlsx"))
+            
+        if not files:
+            return None
+            
+        # 수정 시간 기준 정렬
+        return max(files, key=lambda p: p.stat().st_mtime)
 
 # 전역 설정 객체
 config = Settings()

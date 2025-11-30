@@ -2,6 +2,7 @@
 Excel 내보내기 어댑터 구현
 """
 from pathlib import Path
+import os
 from typing import Dict, Union
 import pandas as pd
 
@@ -33,14 +34,8 @@ class ExcelExporter(DataExporterPort):
         if not data:
             return
             
-        # 파일명 생성 (예: stock_data_2023_2024.xlsx)
-        years = sorted(data.keys())
-        min_year, max_year = years[0], years[-1]
-        
-        if min_year == max_year:
-            filename = f"stock_data_{min_year}.xlsx"
-        else:
-            filename = f"stock_data_{min_year}_{max_year}.xlsx"
+        # 파일명 생성
+        filename = config.get_default_filename()
             
         filepath = os.path.join(self.output_dir, filename)
         
