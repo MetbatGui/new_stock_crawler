@@ -30,6 +30,7 @@ def _build_dependencies(headless: bool = config.HEADLESS):
     from infra.adapters.data.excel_exporter import ExcelExporter
     from infra.adapters.data.fdr_adapter import FDRAdapter
     from core.services.crawler_service import CrawlerService
+    from core.services.stock_price_enricher import StockPriceEnricher
     
     # 1. 유틸리티
     logger = ConsoleLogger()
@@ -43,14 +44,19 @@ def _build_dependencies(headless: bool = config.HEADLESS):
     # 3. Storage
     from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
     storage_adapter = GoogleDriveAdapter()
+
+    # 3.5 Enrichment
+    stock_enricher = StockPriceEnricher(
+        ticker_mapper=fdr_adapter,
+        market_data_provider=fdr_adapter,
+        logger=logger
+    )
     
     # 4. Web Scraping
     page_provider = PlaywrightPageProvider(headless=headless)
     calendar_scraper = CalendarScraperAdapter()
     detail_scraper = DetailScraperAdapter(
-        logger=logger,
-        ticker_mapper=fdr_adapter,
-        market_data_provider=fdr_adapter
+        logger=logger
     )
     
     # 5. Service
@@ -60,7 +66,9 @@ def _build_dependencies(headless: bool = config.HEADLESS):
         detail_scraper=detail_scraper,
         data_mapper=data_mapper,
         data_exporter=data_exporter,
+        data_exporter=data_exporter,
         date_calculator=date_calculator,
+        stock_enricher=stock_enricher,
         logger=logger
     )
     
@@ -147,7 +155,9 @@ def enrich_data(
     from infra.adapters.data.fdr_adapter import FDRAdapter
     from infra.adapters.data.excel_exporter import ExcelExporter
     from infra.adapters.utils.console_logger import ConsoleLogger
+    from infra.adapters.utils.console_logger import ConsoleLogger
     from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
+    from core.services.stock_price_enricher import StockPriceEnricher
     
     logger = ConsoleLogger()
     
@@ -186,9 +196,14 @@ def enrich_data(
     data_exporter = ExcelExporter()  # config 사용
     storage_adapter = GoogleDriveAdapter()
     
-    enrichment_service = EnrichmentService(
+    stock_enricher = StockPriceEnricher(
         ticker_mapper=fdr_adapter,
         market_data_provider=fdr_adapter,
+        logger=logger
+    )
+    
+    enrichment_service = EnrichmentService(
+        stock_enricher=stock_enricher,
         data_exporter=data_exporter,
         logger=logger
     )

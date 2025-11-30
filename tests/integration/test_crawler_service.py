@@ -23,6 +23,8 @@ class TestCrawlerService:
             'data_mapper': Mock(),
             'data_exporter': Mock(),
             'date_calculator': Mock(),
+            'date_calculator': Mock(),
+            'stock_enricher': Mock(),
             'logger': Mock()
         }
     
@@ -39,6 +41,7 @@ class TestCrawlerService:
         assert crawler_service.data_mapper == mock_dependencies['data_mapper']
         assert crawler_service.data_exporter == mock_dependencies['data_exporter']
         assert crawler_service.date_calculator == mock_dependencies['date_calculator']
+        assert crawler_service.stock_enricher == mock_dependencies['stock_enricher']
         assert crawler_service.logger == mock_dependencies['logger']
     
     def test_run_with_single_year(self, crawler_service, mock_dependencies):
@@ -87,6 +90,7 @@ class TestCrawlerService:
             tradable_shares_percent="90%"
         )
         mock_dependencies['detail_scraper'].scrape_details.return_value = [mock_stock]
+        mock_dependencies['stock_enricher'].enrich_stock_info.return_value = mock_stock
         
         # Given: 데이터 매퍼가 DataFrame 반환
         import pandas as pd
@@ -113,6 +117,7 @@ class TestCrawlerService:
             page=mock_page,
             stocks=[stock_tuple]
         )
+        mock_dependencies['stock_enricher'].enrich_stock_info.assert_called_once_with(mock_stock)
         mock_dependencies['data_mapper'].to_dataframe.assert_called_once()
         mock_dependencies['data_exporter'].export.assert_called_once()
     
@@ -163,6 +168,7 @@ class TestCrawlerService:
         mock_dependencies['detail_scraper'].scrape_details.return_value = [
             Mock(spec=StockInfo)
         ]
+        mock_dependencies['stock_enricher'].enrich_stock_info.side_effect = lambda x: x
         
         import pandas as pd
         mock_dependencies['data_mapper'].to_dataframe.return_value = pd.DataFrame([{'name': 'test'}])
@@ -221,6 +227,7 @@ class TestCrawlerService:
             tradable_shares_percent="90%"
         )
         mock_dependencies['detail_scraper'].scrape_details.return_value = [mock_stock]
+        mock_dependencies['stock_enricher'].enrich_stock_info.return_value = mock_stock
         
         # Given: 데이터 매퍼가 DataFrame 반환
         import pandas as pd
@@ -371,6 +378,7 @@ class TestCrawlerService:
             tradable_shares_percent=""
         )
         mock_dependencies['detail_scraper'].scrape_details.return_value = [mock_stock]
+        mock_dependencies['stock_enricher'].enrich_stock_info.return_value = mock_stock
         
         # Mock: DataFrame (비어있지 않음)
         import pandas as pd
