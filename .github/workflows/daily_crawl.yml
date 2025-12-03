@@ -3,7 +3,7 @@ name: Daily IPO Crawler
 on:
   schedule:
     # 매일 평일 한국 시간 16:01 (UTC 07:01) 실행
-    - cron: '1 7 * * 1-5'
+    - cron: '59 6 * * 1-5'
   workflow_dispatch:  # 수동 실행 가능
 
 jobs:
