@@ -31,8 +31,8 @@ def clean_stock_name(name_raw: str) -> str:
     return name_cleaned.replace("(상장)", "").strip()
 
 def is_spac_stock(name: str) -> bool:
-    """Check if stock is a SPAC."""
-    return "스팩" in name
+    """Check if stock is a SPAC or REIT."""
+    return "스팩" in name or "리츠" in name
 
 def format_competition_rate(rate_str: str) -> str:
     """Format institutional competition rate."""

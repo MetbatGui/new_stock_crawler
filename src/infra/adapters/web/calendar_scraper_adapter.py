@@ -28,7 +28,8 @@ class CalendarScraperAdapter(CalendarScraperPort):
         year: int,
         start_month: int,
         end_month: int,
-        today_day: int
+        today_day: int,
+        start_day: int = 1
     ) -> ScrapeReport:
         """캘린더 스크래핑 (기존 CalendarParser 로직)"""
         total_spacs = 0
@@ -41,7 +42,7 @@ class CalendarScraperAdapter(CalendarScraperPort):
             self._goto_month(page, year, month)
             
             # 파싱
-            spacs, results = self._parse_table(page, month, today_day, is_current)
+            spacs, results = self._parse_table(page, month, today_day, start_day, is_current)
             total_spacs += spacs
             total_results.extend(results)
         
@@ -59,7 +60,7 @@ class CalendarScraperAdapter(CalendarScraperPort):
         page.wait_for_load_state("networkidle")
     
     def _parse_table(
-        self, page: Page, month: int, today_day: int, is_current: bool
+        self, page: Page, month: int, today_day: int, start_day: int, is_current: bool
     ) -> Tuple[int, List[Tuple[str, str]]]:
         """테이블 파싱"""
         calendar_table = page.locator('table[summary="증시캘린더"]')
@@ -73,7 +74,7 @@ class CalendarScraperAdapter(CalendarScraperPort):
         
         for i in range(cells.count()):
             spack_count, cell_results = self._parse_cell(
-                cells.nth(i), month, today_day, is_current
+                cells.nth(i), month, today_day, start_day, is_current
             )
             spacks_total += spack_count
             results_total.extend(cell_results)
@@ -81,14 +82,14 @@ class CalendarScraperAdapter(CalendarScraperPort):
         return spacks_total, results_total
 
     def _parse_cell(
-        self, cell: Locator, current_month: int, today_day: int, is_current_month: bool
+        self, cell: Locator, current_month: int, today_day: int, start_day: int, is_current_month: bool
     ) -> Tuple[int, List[Tuple[str, str]]]:
         """단일 셀 파싱"""
         day = self._extract_day(cell)
         if day is None:
             return 0, []
         
-        if self._should_skip(day, today_day, is_current_month):
+        if self._should_skip(day, today_day, start_day, is_current_month):
             return 0, []
         
         try:
@@ -107,9 +108,16 @@ class CalendarScraperAdapter(CalendarScraperPort):
         except ValueError:
             return None
 
-    def _should_skip(self, day: int, today_day: int, is_current_month: bool) -> bool:
+    def _should_skip(self, day: int, today_day: int, start_day: int, is_current_month: bool) -> bool:
         """스킵 여부 결정"""
-        return is_current_month and day >= today_day
+        # 현재 월인 경우: start_day보다 작거나, today_day보다 크면 스킵
+        # today_day 포함 (>)
+        if is_current_month:
+            if day < start_day:
+                return True
+            if day > today_day:
+                return True
+        return False
 
     def _extract_links(self, cell: Locator) -> Tuple[int, List[Tuple[str, str]]]:
         """링크 추출"""

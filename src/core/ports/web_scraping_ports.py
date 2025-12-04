@@ -44,7 +44,8 @@ class CalendarScraperPort(ABC):
         year: int,
         start_month: int,
         end_month: int,
-        today_day: int
+        today_day: int,
+        start_day: int = 1
     ) -> ScrapeReport:
         """캘린더에서 IPO 목록 추출"""
         pass

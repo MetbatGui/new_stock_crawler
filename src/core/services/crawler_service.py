@@ -136,7 +136,8 @@ class CrawlerService:
             year=year,
             start_month=month,
             end_month=month,
-            today_day=day
+            today_day=day,
+            start_day=day
         )
         
         if not report.results:

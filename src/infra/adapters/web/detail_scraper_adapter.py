@@ -210,7 +210,9 @@ class DetailScraperAdapter(DetailScraperPort):
             return []
         
         for row_idx in range(min(5, len(grid))):
-            if "유통가능" in grid[row_idx][header_col] and "물량" in grid[row_idx][header_col]:
+            # "유통가능"과 "물량"이 모두 포함되어 있거나, "유통가능물량"이 포함된 경우
+            cell_text = grid[row_idx][header_col].replace(" ", "")
+            if "유통가능" in cell_text and "물량" in cell_text:
                 return self._find_sub_columns(grid, row_idx, header_col)
         
         return [header_col, header_col + 1]
@@ -219,7 +221,8 @@ class DetailScraperAdapter(DetailScraperPort):
         """헤더에서 유통가능물량 열 인덱스 찾기"""
         for row_idx in range(min(5, len(grid))):
             for col_idx, cell_text in enumerate(grid[row_idx]):
-                if "유통가능" in cell_text and "물량" in cell_text:
+                clean_text = cell_text.replace(" ", "")
+                if "유통가능" in clean_text and "물량" in clean_text:
                     return col_idx
         return None
 
