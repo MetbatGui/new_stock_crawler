@@ -73,6 +73,10 @@ class DataFrameMapper(DataMapperPort):
         
         for col in numeric_cols:
             if col in df.columns:
+                # 문자열인 경우 쉼표 제거
+                if df[col].dtype == 'object':
+                    df[col] = df[col].astype(str).str.replace(',', '')
+                
                 # 숫자로 변환 (에러 발생 시 NaN)
                 df[col] = pd.to_numeric(df[col], errors='coerce')
                 # 반올림 후 Int64 (Nullable Integer)로 변환
