@@ -1,7 +1,7 @@
 """
 크롤링 비즈니스 로직 서비스
 """
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Dict, List
 import pandas as pd
 
@@ -111,68 +111,103 @@ class CrawlerService:
             
         return yearly_data
     
-    def run_daily(self, target_date: date) -> Dict[int, pd.DataFrame]:
+    def run_scheduled(self, start_date: date, days_ahead: int = 3) -> Dict[int, pd.DataFrame]:
         """
-        특정 날짜만 크롤링 (일일 업데이트용)
+        일일 스케줄 크롤링 (당일 + 향후 N일)
         
         Args:
-            target_date: 크롤링할 날짜
+            start_date: 시작 날짜 (보통 오늘)
+            days_ahead: 향후 며칠까지 수집할지 (기본 3일)
             
         Returns:
-            연도별 DataFrame 딕셔너리 (해당 날짜 데이터만)
+            연도별 DataFrame 딕셔너리
         """
-        year = target_date.year
-        month = target_date.month
-        day = target_date.day
         
-        self.logger.info(f"[일일 업데이트] {target_date} 크롤링 시작")
+        self.logger.info(f"[스케줄 크롤링] {start_date} ~ {days_ahead}일 후까지 수집 시작")
         
         # Page 객체 준비
         page = self.page_provider.get_page()
         
-        # 해당 월의 캘린더 조회 (day_limit로 해당 날짜까지만)
-        report = self.calendar_scraper.scrape_calendar(
-            page=page,
-            year=year,
-            start_month=month,
-            end_month=month,
-            today_day=day,
-            start_day=day
-        )
+        # 수집할 날짜 리스트 생성
+        target_dates = [start_date + timedelta(days=i) for i in range(days_ahead + 1)]
         
-        if not report.results:
-            self.logger.info(f"[{target_date}] 상장 예정 항목 없음")
-            return {}
+        yearly_data: Dict[int, pd.DataFrame] = {}
+        total_collected = 0
         
-        self.logger.info(
-            f"[{target_date}] {report.final_stock_count}개 종목 발견 "
-            f"(스팩 {report.spack_filtered_count}개 제외)"
-        )
-        
-        # 상세 정보 수집
-        stock_details = self.detail_scraper.scrape_details(
-            page=page,
-            stocks=report.results
-        )
-        
-        # 데이터 보강 (OHLC)
-        enriched_details = [
-            self.stock_enricher.enrich_stock_info(stock) 
-            for stock in stock_details
-        ]
-        
-        # DataFrame 변환
-        df = self.data_mapper.to_dataframe(enriched_details)
-        
-        if not df.empty:
-            yearly_data = {year: df}
-            self.logger.info(f"[{target_date}] {len(df)}건 수집 완료")
+        for target_date in target_dates:
+            year = target_date.year
+            month = target_date.month
+            day = target_date.day
             
-            # 데이터 저장
+            # 해당 월의 캘린더 조회
+            report = self.calendar_scraper.scrape_calendar(
+                page=page,
+                year=year,
+                start_month=month,
+                end_month=month,
+                today_day=day,
+                start_day=day
+            )
+            
+            if not report.results:
+                continue
+            
+            self.logger.info(
+                f"[{target_date}] {report.final_stock_count}개 종목 발견 "
+                f"(스팩 {report.spack_filtered_count}개 제외)"
+            )
+            
+            # 상세 정보 수집
+            stock_details = self.detail_scraper.scrape_details(
+                page=page,
+                stocks=report.results
+            )
+            
+            # 데이터 보강 (조건부 OHLC)
+            enriched_details = []
+            now = datetime.now()
+            today = date.today()
+            
+            for stock in stock_details:
+                # OHLC 수집 조건 판단
+                should_enrich = False
+                
+                # 1. 과거 날짜: 무조건 수집
+                if target_date < today:
+                    should_enrich = True
+                # 2. 오늘: 16시 이후에만 수집
+                elif target_date == today:
+                    if now.hour >= 16:
+                        should_enrich = True
+                    else:
+                        self.logger.info(f"      ⏳ 장 마감 전(16시 이전)이므로 OHLC 수집 생략: {stock.name}")
+                # 3. 미래: 수집 안 함 (기본값 False)
+                else:
+                    self.logger.info(f"      📅 미래 상장 예정이므로 OHLC 수집 생략: {stock.name}")
+                
+                if should_enrich:
+                    enriched_details.append(self.stock_enricher.enrich_stock_info(stock))
+                else:
+                    enriched_details.append(stock)
+            
+            # DataFrame 변환
+            df = self.data_mapper.to_dataframe(enriched_details)
+            
+            if not df.empty:
+                # 연도별 데이터 병합
+                if year in yearly_data:
+                    yearly_data[year] = pd.concat([yearly_data[year], df], ignore_index=True)
+                else:
+                    yearly_data[year] = df
+                
+                total_collected += len(df)
+                self.logger.info(f"[{target_date}] {len(df)}건 처리 완료")
+        
+        # 데이터 저장
+        if yearly_data:
             self.data_exporter.export(yearly_data)
-            self.logger.info("저장 완료")
-            
-            return yearly_data
+            self.logger.info(f"총 {total_collected}건 저장 완료")
         else:
-            self.logger.info(f"[{target_date}] 수집된 데이터 없음")
-            return {}
+            self.logger.info("수집된 데이터 없음")
+            
+        return yearly_data
