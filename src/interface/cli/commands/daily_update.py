@@ -21,6 +21,7 @@ def daily_update(
     특정 날짜의 IPO 데이터만 크롤링하여 기존 엑셀에 추가합니다.
     날짜를 지정하지 않으면 오늘 날짜로 실행됩니다.
     """
+    
     # 날짜 파싱
     if target_date:
         try:
@@ -35,22 +36,41 @@ def daily_update(
     
     try:
         deps['logger'].info("=" * 60)
-        deps['logger'].info("📅 Stock Crawler - 일일 업데이트")
-        deps['logger'].info(f"대상 날짜: {parsed_date}")
+        deps['logger'].info("📅 Stock Crawler - 일일 스케줄 업데이트")
+        deps['logger'].info(f"시작 날짜: {parsed_date}")
+        deps['logger'].info(f"수집 범위: 당일 + 3일 (총 4일)")
         deps['logger'].info(f"💾 모드: {'Google Drive' if drive else 'Local'}")
         deps['logger'].info("=" * 60)
         
         # Playwright 초기화
         deps['page_provider'].setup()
         
-        # 일일 크롤링 실행
-        new_data = deps['crawler'].run_daily(target_date=parsed_date)
+        # Google Drive 모드일 경우, 기존 파일 다운로드 (Append를 위해)
+        if drive:
+            try:
+                target_filename = config.get_default_filename()
+                deps['logger'].info(f"🔍 Google Drive에서 기존 파일 검색 중: {target_filename}")
+                
+                files = deps['storage'].list_files(f"name = '{target_filename}'")
+                if files:
+                    latest_file = files[0]
+                    target_path = config.get_output_path(target_filename)
+                    deps['logger'].info(f"⬇️  기존 파일 다운로드 중: {target_path}")
+                    deps['storage'].download_file(latest_file['id'], target_path)
+                    deps['logger'].info("✅ 다운로드 완료 (기존 데이터 병합 준비 완료)")
+                else:
+                    deps['logger'].info("ℹ️  Google Drive에 기존 파일이 없습니다. (신규 생성 예정)")
+            except Exception as e:
+                deps['logger'].warning(f"⚠️  Google Drive 파일 다운로드 실패 (신규 생성 진행): {e}")
+
+        # 일일 스케줄 크롤링 실행 (당일 + 3일)
+        new_data = deps['crawler'].run_scheduled(start_date=parsed_date, days_ahead=3)
         
         if new_data:
             total_count = sum(len(df) for df in new_data.values())
-            deps['logger'].info(f"✅ {total_count}건 추가됨")
+            deps['logger'].info(f"✅ 총 {total_count}건 처리됨")
         else:
-            deps['logger'].info("ℹ️  오늘은 상장 예정 없음")
+            deps['logger'].info("ℹ️  수집된 상장 정보 없음")
         
         deps['logger'].info("=" * 60)
         deps['logger'].info("🏁 일일 업데이트 완료")

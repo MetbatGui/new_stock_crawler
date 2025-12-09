@@ -6,7 +6,7 @@ from typing import Optional
 from config import config
 from interface.cli.dependencies import build_dependencies
 from core.services.enrichment_service import EnrichmentService
-from infra.adapters.data.fdr_adapter import FDRAdapter
+from infra.adapters.data.pykrx_adapter import PyKrxAdapter
 from infra.adapters.data.excel_exporter import ExcelExporter
 from infra.adapters.utils.console_logger import ConsoleLogger
 from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
@@ -92,12 +92,12 @@ def enrich_data(
             raise typer.Exit(code=1)
         
         # 서비스 초기화
-        fdr_adapter = FDRAdapter()
+        pykrx_adapter = PyKrxAdapter()
         data_exporter = ExcelExporter()
         
         stock_enricher = StockPriceEnricher(
-            ticker_mapper=fdr_adapter,
-            market_data_provider=fdr_adapter,
+            ticker_mapper=pykrx_adapter,
+            market_data_provider=pykrx_adapter,
             logger=logger
         )
         
