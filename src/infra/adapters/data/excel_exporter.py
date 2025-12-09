@@ -61,13 +61,18 @@ class ExcelExporter(DataExporterPort):
                             combined_df = combined_df.drop_duplicates(subset=['종목명'], keep='last')
                             
                             # 상장일 기준 정렬 (선택 사항)
-                            if '상장일' in combined_df.columns:
-                                combined_df = combined_df.sort_values(by='상장일', ascending=False)
+                            # if '상장일' in combined_df.columns:
+                            #     combined_df = combined_df.sort_values(by='상장일', ascending=False)
                                 
                             data[year] = combined_df
                             print(f"      [병합 완료] {year}년: 총 {len(combined_df)}건 (기존 {len(existing_df)} + 신규 {len(new_df)})")
             except Exception as e:
                 print(f"      [경고] 기존 파일 병합 실패 (덮어쓰기 진행): {e}")
+
+        # 모든 데이터에 대해 상장일 기준 내림차순 정렬 (최신순)
+        for year, df in data.items():
+            if '상장일' in df.columns:
+                data[year] = df.sort_values(by='상장일', ascending=False)
 
         # 엑셀 저장
         with pd.ExcelWriter(filepath, engine="openpyxl") as writer:
