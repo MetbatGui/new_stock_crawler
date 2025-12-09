@@ -40,9 +40,16 @@ class GoogleDriveAdapter(StoragePort):
             
         # 2. 토큰이 없거나 유효하지 않으면 새로 인증
         if not creds or not creds.valid:
+            refreshed = False
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
+                try:
+                    creds.refresh(Request())
+                    refreshed = True
+                except Exception as e:
+                    print(f"[GoogleDrive] ⚠️ 토큰 갱신 실패: {e}")
+                    creds = None
+
+            if not refreshed:
                 if not os.path.exists(self.client_secret_file):
                     raise FileNotFoundError(f"인증 파일을 찾을 수 없습니다: {self.client_secret_file}")
                     
