@@ -5,9 +5,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
@@ -23,44 +21,22 @@ class GoogleDriveAdapter(StoragePort):
     SCOPES = ['https://www.googleapis.com/auth/drive.file']
     
     def __init__(self, service_account_file: str = None, folder_id: str = None):
-        self.client_secret_file = service_account_file or config.GOOGLE_SERVICE_ACCOUNT_FILE
-        self.token_file = Path(self.client_secret_file).parent / 'token.json'
+        self.service_account_file = service_account_file or config.GOOGLE_SERVICE_ACCOUNT_FILE
         self.folder_id = folder_id or config.GOOGLE_DRIVE_FOLDER_ID
         self._service = None
         
     def _authenticate(self):
-        """Google Drive API 인증 및 서비스 생성 (OAuth 2.0 Client)"""
+        """Google Drive API 인증 및 서비스 생성 (Service Account)"""
         if self._service:
             return
 
-        creds = None
-        # 1. 저장된 토큰이 있으면 로드
-        if self.token_file.exists():
-            creds = Credentials.from_authorized_user_file(str(self.token_file), self.SCOPES)
+        if not os.path.exists(self.service_account_file):
+            raise FileNotFoundError(f"인증 파일을 찾을 수 없습니다: {self.service_account_file}")
             
-        # 2. 토큰이 없거나 유효하지 않으면 새로 인증
-        if not creds or not creds.valid:
-            refreshed = False
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    refreshed = True
-                except Exception as e:
-                    print(f"[GoogleDrive] ⚠️ 토큰 갱신 실패: {e}")
-                    creds = None
-
-            if not refreshed:
-                if not os.path.exists(self.client_secret_file):
-                    raise FileNotFoundError(f"인증 파일을 찾을 수 없습니다: {self.client_secret_file}")
-                    
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.client_secret_file, self.SCOPES
-                )
-                creds = flow.run_local_server(port=0)
-                
-            # 3. 토큰 저장
-            with open(self.token_file, 'w') as token:
-                token.write(creds.to_json())
+        creds = service_account.Credentials.from_service_account_file(
+            self.service_account_file, 
+            scopes=self.SCOPES
+        )
             
         self._service = build('drive', 'v3', credentials=creds)
 
