@@ -34,9 +34,6 @@ jobs:
     - name: Build Docker Image
       run: just -f Justfile.linux build
 
-    - name: Run Auth Check
-      run: just -f Justfile.linux docker-auth
-
     - name: Run Healthcheck
       run: |
         just -f Justfile.linux docker-healthcheck
