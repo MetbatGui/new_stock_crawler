@@ -9,7 +9,7 @@ init:
     @if not exist .env ( copy .env.example .env ) else ( echo "ℹ️  .env 파일이 이미 존재합니다." )
     @if not exist secrets ( mkdir secrets ) else ( echo "ℹ️  secrets 폴더가 이미 존재합니다." )
     uv sync
-    @echo "✅ 설정 완료! secrets/client_secret.json 파일을 넣고 'just auth'를 실행하세요."
+    @echo "✅ 설정 완료! secrets/service_account.json 파일을 넣고 'just auth'를 실행하세요."
 
 
 build:

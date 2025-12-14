@@ -93,17 +93,6 @@ uv run crawler --help
    docker run -v $(pwd)/reports:/app/reports stock-crawler daily
    ```
 
-## 🤖 GitHub Actions 자동화
-
-이 저장소에는 **평일 오후 4시(한국 시간)**에 자동으로 실행되는 워크플로우가 포함되어 있습니다.
-
-- 파일 위치: `.github/workflows/daily_crawl.yml`
-- 동작:
-  1. 평일 16:00에 실행
-  2. `uv run crawler daily` 실행
-  3. 변경된 엑셀 파일이 있으면 자동으로 **Commit & Push**
-
-> **주의**: GitHub Actions에서 엑셀 파일을 커밋하려면 레포지토리 설정에서 `Workflow permissions`를 `Read and write permissions`로 변경해야 할 수 있습니다.
 
 ## 📊 데이터 구조
 
