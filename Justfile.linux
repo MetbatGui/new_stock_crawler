@@ -3,20 +3,45 @@
 default:
     @just -f Justfile.linux --list
 
+# 초기 설정
+init:
+    @echo "🚀 초기 설정을 시작합니다..."
+    @if [ ! -f .env ]; then cp .env.example .env; echo "ℹ️  .env 파일 생성됨"; else echo "ℹ️  .env 파일이 이미 존재합니다."; fi
+    @if [ ! -d secrets ]; then mkdir secrets; echo "ℹ️  secrets 폴더 생성됨"; else echo "ℹ️  secrets 폴더가 이미 존재합니다."; fi
+    uv sync
+    @echo "✅ 설정 완료! secrets/client_secret.json 파일을 넣고 'just auth'를 실행하세요."
+
 build:
     docker compose build
 
-healthcheck:
-    uv run crawler healthcheck
+# Docker execution
+docker-full year="2020":
+    docker compose run --rm crawler crawler full --start-year {{year}} --drive
+
+docker-daily date="":
+    docker compose run --rm crawler crawler daily {{ if date != "" { "--date " + date } else { "" } }} --drive
+
+docker-enrich:
+    docker compose run --rm crawler crawler enrich --drive
+
+docker-auth:
+    docker compose run --rm crawler crawler auth
 
 docker-healthcheck:
     docker compose run --rm crawler crawler healthcheck
 
-daily:
-    uv run crawler daily --drive
+# Local execution (using uv) - Default
+auth:
+    uv run crawler auth
 
-docker-daily:
-    docker compose run --rm crawler crawler daily --drive
+healthcheck:
+    uv run crawler healthcheck
 
-docker-auth:
-    docker compose run --rm crawler crawler auth
+full year="2020":
+    uv run crawler full --start-year {{year}} --drive
+
+daily date="":
+    uv run crawler daily {{ if date != "" { "--date " + date } else { "" } }} --drive
+
+enrich:
+    uv run crawler enrich --drive
