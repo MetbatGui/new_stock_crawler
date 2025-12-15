@@ -80,7 +80,12 @@ def enrich_data(
         
         for sheet_name in excel_file.sheet_names:
             try:
-                year = int(sheet_name)
+                # "2024년" 등에서 숫자만 추출
+                year_str = "".join(filter(str.isdigit, sheet_name))
+                if not year_str:
+                    continue
+                year = int(year_str)
+                
                 df = pd.read_excel(target_path, sheet_name=sheet_name)
                 yearly_data[year] = df
                 logger.info(f"    - [{year}년] {len(df)}건 로드 완료")
