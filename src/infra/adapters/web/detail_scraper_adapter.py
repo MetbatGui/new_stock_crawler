@@ -73,8 +73,11 @@ class DetailScraperAdapter(DetailScraperPort):
             return self._create_stock_info(
                 name, href, company_info, offering_info, schedule_info, tradable_info
             )
-        except Exception:
-            # 로깅은 서비스 계층에서 처리하거나, 필요시 에러 로거 주입
+        except Exception as e:
+            if self.logger:
+                self.logger.error(
+                    f"[{name}] 스크래핑 실패 ({href}): {e!r}"
+                )
             return None
 
     def _get_value(self, table: Locator, key_text: str) -> str:

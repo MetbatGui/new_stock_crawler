@@ -1,55 +1,7 @@
-# src/domain/ports.py
-from abc import ABC, abstractmethod
-from typing import Generator, Tuple, List, Dict 
-from playwright.sync_api import Page
-from core.domain.models import ScrapeReport, StockInfo
-import pandas as pd
-
-class IPOInfoPort(ABC):
-    
-    @abstractmethod
-    def setup(self) -> None:
-        pass
-
-    @abstractmethod
-    def cleanup(self) -> None:
-        pass
-
-    @abstractmethod
-    def test_navigation(self, year: int, start_month: int, end_month: int) -> None:
-        pass
-
-    @abstractmethod
-    def get_ipos_for_period(
-        self, year: int, start_month: int, end_month: int, today_day: int
-    ) -> ScrapeReport:
-        """
-        지정된 기간 동안의 IPO 목록을 스크랩하고 ScrapeReport를 반환합니다.
-        """
-        pass
-
-    # ▼ [수정] 반환 타입이 None -> List[StockInfo] 로 변경
-    @abstractmethod
-    def scrape_stock_details(self, stocks: List[Tuple[str, str]]) -> List[StockInfo]:
-        """
-        수집된 (종목명, href) 리스트를 받아 세부 정보를 스크랩하고
-        StockInfo 객체 리스트를 반환합니다.
-        """
-        pass
-
-
-class PersistencePort(ABC):
-    """
-    데이터 저장을 위한 아웃바운드 포트 (인터페이스)
-    """
-    
-    @abstractmethod
-    def save_report(self, data: Dict[int, pd.DataFrame]) -> None:
-        """
-        스크래핑 리포트(DataFrame) 딕셔너리를 저장합니다.
-        
-        Args:
-            data (Dict[int, pd.DataFrame]): {연도: DataFrame} 형태의 
-                                            전체 데이터 딕셔너리.
-        """
-        pass
+# src/domain/ports.py (레거시 포트 — 현재 미사용, 추후 삭제 예정)
+# 현재 사용 포트: web_scraping_ports.py, data_ports.py, utility_ports.py,
+#                 storage_ports.py, enrichment_ports.py
+#
+# IPOInfoPort, PersistencePort는 초기 설계 시 정의된 포트로,
+# 이후 역할별로 세분화된 포트들로 대체됨.
+# 남겨두되 import 시 사용하지 말 것. 다음 대형 리팩터링 시 파일 삭제 예정.

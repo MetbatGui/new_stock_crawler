@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -40,7 +41,7 @@ class Settings(BaseSettings):
         """기본 파일명을 반환합니다 (고정값)."""
         return "신규상장종목.xlsx"
 
-    def get_latest_output_file(self) -> Path:
+    def get_latest_output_file(self) -> Optional[Path]:
         """output 디렉토리에서 대상 엑셀 파일을 반환합니다."""
         if not self.OUTPUT_DIR.exists():
             return None

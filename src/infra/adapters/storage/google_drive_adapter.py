@@ -120,32 +120,45 @@ class GoogleDriveAdapter(StoragePort):
 
     def list_files(self, query: str = None) -> list:
         """
-        파일 목록 조회
-        
+        파일 목록 조회 (페이지네이션 지원)
+
         Args:
             query: 검색 쿼리 (예: "name contains '신규상장종목'")
-            
+
         Returns:
             list: 파일 메타데이터 리스트 [{'id': ..., 'name': ..., 'createdTime': ...}]
         """
         self._authenticate()
-        
+
         q = "trashed = false"
         if self.folder_id:
             q += f" and '{self.folder_id}' in parents"
         if query:
             q += f" and ({query})"
-            
-        results = self._service.files().list(
-            q=q,
-            pageSize=10,
-            fields="nextPageToken, files(id, name, createdTime)",
-            orderBy="createdTime desc"
-        ).execute()
-        
-        files = results.get('files', [])
-        print(f"      [Google Drive] 파일 목록 조회 완료 (Query: {query}, Found: {len(files)}개)")
-        return files
+
+        all_files = []
+        page_token = None
+
+        while True:
+            kwargs: dict = {
+                "q": q,
+                "pageSize": 100,
+                "fields": "nextPageToken, files(id, name, createdTime)",
+                "orderBy": "createdTime desc",
+            }
+            if page_token:
+                kwargs["pageToken"] = page_token
+
+            results = self._service.files().list(**kwargs).execute()
+            all_files.extend(results.get("files", []))
+
+            page_token = results.get("nextPageToken")
+            if not page_token:
+                break
+
+        print(f"      [Google Drive] 파일 목록 조회 완료 (Query: {query}, Found: {len(all_files)}개)")
+        return all_files
+
 
     def download_file(self, file_id: str, local_path: Path) -> None:
         """

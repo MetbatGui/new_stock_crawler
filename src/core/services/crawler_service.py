@@ -2,7 +2,7 @@
 크롤링 비즈니스 로직 서비스
 """
 from datetime import date, datetime, timedelta
-from typing import Dict, List
+from typing import Callable, Dict, List
 import pandas as pd
 
 from core.ports.web_scraping_ports import PageProvider, CalendarScraperPort, DetailScraperPort
@@ -31,7 +31,8 @@ class CrawlerService:
         data_exporter: DataExporterPort,
         date_calculator: DateRangeCalculatorPort,
         stock_enricher: StockPriceEnricher,
-        logger: LoggerPort
+        logger: LoggerPort,
+        clock: Callable[[], datetime] = datetime.now,
     ):
         # 모든 의존성을 생성자에서 받음 (명시적)
         self.page_provider = page_provider
@@ -42,6 +43,8 @@ class CrawlerService:
         self.date_calculator = date_calculator
         self.stock_enricher = stock_enricher
         self.logger = logger
+        # clock: Callable[[], datetime] 주입으로 시간 의존 로직 테스트 가능
+        self.clock = clock
     
     def run(self, start_year: int) -> Dict[int, pd.DataFrame]:
         """
@@ -165,8 +168,8 @@ class CrawlerService:
             
             # 데이터 보강 (조건부 OHLC)
             enriched_details = []
-            now = datetime.now()
-            today = date.today()
+            now = self.clock()
+            today = now.date()
             
             for stock in stock_details:
                 # OHLC 수집 조건 판단

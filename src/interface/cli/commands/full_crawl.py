@@ -1,5 +1,4 @@
 import typer
-import os
 from datetime import date
 from config import config
 from interface.cli.dependencies import build_dependencies
@@ -11,9 +10,9 @@ def full_crawl(
 ):
     """
     전체 기간 크롤링 (초기 수집용)
-    
+
     지정한 연도부터 현재까지의 모든 IPO 데이터를 수집합니다.
-    각 기업 스크래핑 직후 즉시 OHLC 데이터를 FDR로 조회하여 추가합니다.
+    각 기업 스크래핑 직후 즉시 OHLC 데이터를 PyKrx로 조회하여 추가합니다.
     """
     deps = build_dependencies(headless=headless)
     
@@ -63,11 +62,7 @@ def full_crawl(
             except Exception as e:
                 deps['logger'].warning(f"⚠️  Google Drive 처리 실패: {e}")
             finally:
-                # 로컬 파일 유지 (사용자 요청)
-                # if output_path.exists():
-                #     os.remove(output_path)
-                #     deps['logger'].info(f"🗑️  임시 파일 삭제 완료: {output_path}")
-                pass
+                pass  # 로컈 파일 유지 (당분은 삭제 안 함)
             
         deps['logger'].info("=" * 60)
         

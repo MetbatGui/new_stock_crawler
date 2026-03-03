@@ -13,7 +13,6 @@ from infra.adapters.web.calendar_scraper_adapter import CalendarScraperAdapter
 from infra.adapters.web.detail_scraper_adapter import DetailScraperAdapter
 from infra.adapters.data.dataframe_mapper import DataFrameMapper
 from infra.adapters.data.excel_exporter import ExcelExporter
-# from infra.adapters.data.fdr_adapter import FDRAdapter
 from infra.adapters.data.pykrx_adapter import PyKrxAdapter
 from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
 
@@ -32,7 +31,6 @@ def build_dependencies(headless: bool = True) -> Dict[str, Any]:
     date_calculator = DateCalculator()
     
     # 2. Data
-    # fdr_adapter = FDRAdapter()
     pykrx_adapter = PyKrxAdapter()
     data_mapper = DataFrameMapper()
     data_exporter = ExcelExporter()

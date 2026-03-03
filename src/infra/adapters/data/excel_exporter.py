@@ -5,6 +5,7 @@ from pathlib import Path
 import os
 from typing import Dict, Union
 import pandas as pd
+from openpyxl.utils import get_column_letter
 
 from core.ports.data_ports import DataExporterPort
 from config import config
@@ -61,8 +62,10 @@ class ExcelExporter(DataExporterPort):
                             new_df = data[year]
                             combined_df = pd.concat([existing_df, new_df], ignore_index=True)
                             
-                            # 중복 제거 (종목명 기준, 최신 데이터 유지)
-                            combined_df = combined_df.drop_duplicates(subset=['종목명'], keep='last')
+                            # 중복 제거 (종목명 + 상장일 복합키 기준, 최신 데이터 유지)
+                            # 단일 종목명만 사용 시 재상장 종목 등에서 데이터 유실 위험 있음
+                            dedup_keys = [k for k in ['종목명', '상장일'] if k in combined_df.columns]
+                            combined_df = combined_df.drop_duplicates(subset=dedup_keys, keep='last')
                             
                             data[year] = combined_df
                             print(f"      [병합 완료] {year}년: 총 {len(combined_df)}건 (기존 {len(existing_df)} + 신규 {len(new_df)})")
@@ -107,4 +110,5 @@ class ExcelExporter(DataExporterPort):
             
             # 너비 설정 (최소 10, 최대 50)
             width = min(max(max_len + 2, 10), 50)
-            worksheet.column_dimensions[chr(65 + idx)].width = width
+            # chr(65+idx)는 컬럼이 26개 초과 시 잘못된 문자를 생성하므로 get_column_letter 사용
+            worksheet.column_dimensions[get_column_letter(idx + 1)].width = width

@@ -1,7 +1,7 @@
 [project]
 name = "new-stock-crawler"
 version = "0.1.0"
-description = "Add your description here"
+description = "KRX IPO(신규상장) 데이터 자동 수집 및 Excel 저장 크롤러"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -17,7 +17,6 @@ dependencies = [
     "pydantic>=2.9.0",
     "pydantic-settings>=2.12.0",
     "pykrx>=1.0.51",
-    "pytest>=9.0.1",
     "setuptools>=80.9.0",
     "typer>=0.9.0",
 ]
@@ -28,6 +27,7 @@ crawler = "cli:app"
 [dependency-groups]
 dev = [
     "radon>=6.0.1",
+    "pytest>=9.0.1",
     "pytest-cov>=6.0.0",
 ]
 
