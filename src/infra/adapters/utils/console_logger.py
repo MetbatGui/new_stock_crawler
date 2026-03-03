@@ -37,9 +37,20 @@ class ConsoleLogger(LoggerPort):
     @staticmethod
     def _configure_root() -> None:
         """루트 로거 핸들러 설정 (1회만 실행)"""
+        import sys
+        import io
+
         level = _get_log_level()
 
-        handler = logging.StreamHandler(sys.stdout)
+        # Windows CP949 환경에서 이모지 포함 메시지도 출력 가능하도록 UTF-8 강제
+        utf8_stdout = io.TextIOWrapper(
+            sys.stdout.buffer,
+            encoding="utf-8",
+            errors="replace",
+            line_buffering=True,
+        )
+
+        handler = logging.StreamHandler(utf8_stdout)
         handler.setLevel(level)
 
         fmt = logging.Formatter(
