@@ -18,7 +18,7 @@ def parse_to_int(text: str, context: str = "") -> Optional[int]:
             return None
         
         return int(float(cleaned))
-    except (ValueError, Exception) as e:
+    except (ValueError, Exception):
         msg = f"      [경고] 정수 변환 실패: '{text}'"
         if context:
             msg += f" | 항목: {context}"

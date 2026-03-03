@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import Mock
-from datetime import date
 from core.services.stock_price_enricher import StockPriceEnricher
 from core.domain.models import StockInfo
 

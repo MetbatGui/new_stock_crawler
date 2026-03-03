@@ -1,3 +1,6 @@
 @echo off
-uv run crawler daily --drive
+echo 크롤링 업데이트 시작...
+call uv run crawler daily
+echo 엑셀 렌더링 및 구글 드라이브 업로드...
+call uv run crawler export-excel --drive
 pause

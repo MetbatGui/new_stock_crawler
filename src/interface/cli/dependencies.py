@@ -3,7 +3,6 @@ CLI 의존성 주입 모듈
 """
 from typing import Any, Dict
 
-from config import config
 from core.services.crawler_service import CrawlerService
 from core.services.stock_price_enricher import StockPriceEnricher
 from infra.adapters.utils.console_logger import ConsoleLogger

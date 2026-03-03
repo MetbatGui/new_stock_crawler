@@ -42,7 +42,7 @@ def daily_update(
         deps["logger"].info("=" * 60)
         deps["logger"].info("📅 Stock Crawler - 일일 스케줄 업데이트")
         deps["logger"].info(f"시작 날짜: {parsed_date}")
-        deps["logger"].info(f"수집 범위: 당일 + 3일 (총 4일)")
+        deps["logger"].info("수집 범위: 당일 + 3일 (총 4일)")
         deps["logger"].info("=" * 60)
 
         deps["page_provider"].setup()

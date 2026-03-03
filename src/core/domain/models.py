@@ -1,6 +1,6 @@
 # src/domain/models.py
 from dataclasses import dataclass
-from typing import List, Tuple, Optional 
+from typing import List, Tuple 
 
 @dataclass(frozen=True)
 class StockInfo:

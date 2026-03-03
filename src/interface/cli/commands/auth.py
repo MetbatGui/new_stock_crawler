@@ -53,7 +53,7 @@ def auth_drive():
         with open(config.GOOGLE_TOKEN_FILE, 'w') as token:
             token.write(creds.to_json())
             
-        console.print(Panel(f"[success]✅ 인증 성공! 토큰이 저장되었습니다.[/success]", title="인증 완료", border_style="green"))
+        console.print(Panel("[success]✅ 인증 성공! 토큰이 저장되었습니다.[/success]", title="인증 완료", border_style="green"))
         
         # 3. 연결 테스트
         console.print("\n[info]연결 테스트를 수행합니다...[/info]")

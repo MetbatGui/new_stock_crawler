@@ -2,8 +2,6 @@
 상세 정보 스크래핑 어댑터 구현
 """
 import time
-import traceback
-import pandas as pd
 
 from typing import List, Tuple, Optional
 from playwright.sync_api import Page, Locator

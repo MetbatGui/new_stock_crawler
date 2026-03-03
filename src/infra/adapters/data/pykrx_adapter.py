@@ -1,7 +1,6 @@
 from pykrx import stock
 from typing import Optional, Dict
 from datetime import date
-import pandas as pd
 
 from core.ports.enrichment_ports import TickerMapperPort, MarketDataProviderPort
 

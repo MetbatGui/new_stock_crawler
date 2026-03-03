@@ -1,8 +1,7 @@
 """
 주가 정보 보강 서비스
 """
-from datetime import date
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from dataclasses import replace
 import pandas as pd
 

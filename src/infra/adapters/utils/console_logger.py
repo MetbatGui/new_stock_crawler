@@ -34,8 +34,6 @@ class ConsoleLogger(LoggerPort):
 
     def _configure_logger(self) -> None:
         """인스턴스별 로거 핸들러 설정"""
-        import sys
-        import io
 
         level = _get_log_level()
 

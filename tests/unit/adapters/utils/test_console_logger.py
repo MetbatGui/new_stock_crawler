@@ -4,7 +4,6 @@ logging 모듈 기반 출력 검증
 """
 import logging
 import pytest
-from unittest.mock import patch
 
 from infra.adapters.utils.console_logger import ConsoleLogger
 

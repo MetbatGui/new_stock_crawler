@@ -2,14 +2,13 @@
 크롤링 비즈니스 로직 서비스
 """
 from datetime import date, datetime, timedelta
-from typing import Callable, Dict, List
+from typing import Callable, Dict
 import pandas as pd
 
 from core.ports.web_scraping_ports import PageProvider, CalendarScraperPort, DetailScraperPort
 from core.ports.data_ports import DataMapperPort
 from core.ports.repository_ports import RepositoryPort
 from core.ports.utility_ports import DateRangeCalculatorPort, LoggerPort
-from core.domain.models import StockInfo
 from core.services.stock_price_enricher import StockPriceEnricher
 
 

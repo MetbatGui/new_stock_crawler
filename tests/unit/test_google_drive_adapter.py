@@ -4,10 +4,8 @@ GoogleDriveAdapter 단위 테스트
 어댑터는 OAuth2 사용자 인증(token.json) 방식을 사용합니다.
 인증 흐름과 API 호출을 mock으로 격리하여 테스트합니다.
 """
-import json
 import pytest
-from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
 from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
 
@@ -49,7 +47,7 @@ class TestGoogleDriveAdapterUpload:
         mock_files.create.return_value.execute.return_value = {"id": "new_file_id"}
 
         # When
-        with patch("infra.adapters.storage.google_drive_adapter.MediaFileUpload") as mock_media:
+        with patch("infra.adapters.storage.google_drive_adapter.MediaFileUpload"):
             file_id = adapter.upload_file(local_file)
 
         # Then
