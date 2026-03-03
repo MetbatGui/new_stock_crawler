@@ -6,7 +6,8 @@ from typing import Callable, Dict, List
 import pandas as pd
 
 from core.ports.web_scraping_ports import PageProvider, CalendarScraperPort, DetailScraperPort
-from core.ports.data_ports import DataMapperPort, DataExporterPort
+from core.ports.data_ports import DataMapperPort
+from core.ports.repository_ports import RepositoryPort
 from core.ports.utility_ports import DateRangeCalculatorPort, LoggerPort
 from core.domain.models import StockInfo
 from core.services.stock_price_enricher import StockPriceEnricher
@@ -28,7 +29,7 @@ class CrawlerService:
         calendar_scraper: CalendarScraperPort,
         detail_scraper: DetailScraperPort,
         data_mapper: DataMapperPort,
-        data_exporter: DataExporterPort,
+        repository: RepositoryPort,
         date_calculator: DateRangeCalculatorPort,
         stock_enricher: StockPriceEnricher,
         logger: LoggerPort,
@@ -39,7 +40,7 @@ class CrawlerService:
         self.calendar_scraper = calendar_scraper
         self.detail_scraper = detail_scraper
         self.data_mapper = data_mapper
-        self.data_exporter = data_exporter
+        self.repository = repository
         self.date_calculator = date_calculator
         self.stock_enricher = stock_enricher
         self.logger = logger
@@ -105,9 +106,10 @@ class CrawlerService:
                 yearly_data[year] = df
                 self.logger.info(f"[{year}년] {len(df)}건 수집 완료")
         
-        # 4. 데이터 저장
+        # 4. 데이터 저장 (Parquet upsert)
         if yearly_data:
-            self.data_exporter.export(yearly_data)
+            for year, df in yearly_data.items():
+                self.repository.save(year, df)
             self.logger.info("저장 완료")
         else:
             self.logger.warning("저장할 데이터 없음")
@@ -207,9 +209,10 @@ class CrawlerService:
                 total_collected += len(df)
                 self.logger.info(f"[{target_date}] {len(df)}건 처리 완료")
         
-        # 데이터 저장
+        # 데이터 저장 (Parquet upsert)
         if yearly_data:
-            self.data_exporter.export(yearly_data)
+            for year, df in yearly_data.items():
+                self.repository.save(year, df)
             self.logger.info(f"총 {total_collected}건 저장 완료")
         else:
             self.logger.info("수집된 데이터 없음")
