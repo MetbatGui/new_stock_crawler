@@ -1,63 +1,111 @@
+"""
+GoogleDriveAdapter 단위 테스트
+
+어댑터는 OAuth2 사용자 인증(token.json) 방식을 사용합니다.
+인증 흐름과 API 호출을 mock으로 격리하여 테스트합니다.
+"""
+import json
 import pytest
-from unittest.mock import MagicMock, patch
 from pathlib import Path
+from unittest.mock import MagicMock, mock_open, patch
+
 from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
 
-@pytest.fixture
-def mock_config():
-    with patch('infra.adapters.storage.google_drive_adapter.config') as mock:
-        mock.GOOGLE_SERVICE_ACCOUNT_FILE = "dummy_service_account.json"
-        mock.GOOGLE_DRIVE_FOLDER_ID = "dummy_folder_id"
-        yield mock
 
 @pytest.fixture
-def adapter(mock_config):
-    return GoogleDriveAdapter()
+def adapter(tmp_path, monkeypatch):
+    """
+    인증을 건너뛰고 mock service를 직접 주입한 어댑터
+    """
+    monkeypatch.setattr(
+        "infra.adapters.storage.google_drive_adapter.config.GOOGLE_DRIVE_FOLDER_ID",
+        "test_folder_id",
+    )
+    monkeypatch.setattr(
+        "infra.adapters.storage.google_drive_adapter.config.GOOGLE_CLIENT_SECRET_FILE",
+        str(tmp_path / "creds.json"),
+    )
+    monkeypatch.setattr(
+        "infra.adapters.storage.google_drive_adapter.config.GOOGLE_TOKEN_FILE",
+        str(tmp_path / "token.json"),
+    )
+    a = GoogleDriveAdapter()
+    # _service를 mock으로 직접 주입하여 _authenticate 우회
+    a._service = MagicMock()
+    return a
 
-@patch('infra.adapters.storage.google_drive_adapter.build')
-@patch('infra.adapters.storage.google_drive_adapter.service_account.Credentials')
-@patch('infra.adapters.storage.google_drive_adapter.MediaFileUpload')
-@patch('pathlib.Path.exists')
-@patch('os.path.exists')
-def test_upload_file_success(mock_os_exists, mock_path_exists, mock_media_file_upload, mock_creds, mock_build, adapter):
-    # Arrange
-    mock_os_exists.return_value = True # 서비스 계정 파일 존재
-    mock_path_exists.return_value = True # 업로드할 파일 존재
-    
-    mock_service = MagicMock()
-    mock_build.return_value = mock_service
-    
-    mock_files = MagicMock()
-    mock_service.files.return_value = mock_files
-    
-    # list -> execute -> returns dict with files list
-    mock_files.list.return_value.execute.return_value = {'files': []}
-    
-    mock_create = MagicMock()
-    mock_files.create.return_value = mock_create
-    mock_create.execute.return_value = {'id': 'uploaded_file_id'}
-    
-    local_path = Path("test_file.xlsx")
-    
-    # Act
-    file_id = adapter.upload_file(local_path)
-    
-    # Assert
-    assert file_id == 'uploaded_file_id'
-    mock_files.create.assert_called_once()
-    
-    # 호출 인자 검증
-    call_args = mock_files.create.call_args
-    assert call_args.kwargs['body']['name'] == "test_file.xlsx"
-    assert call_args.kwargs['body']['parents'] == ["dummy_folder_id"]
 
-@patch('pathlib.Path.exists')
-@patch('os.path.exists')
-def test_upload_file_not_found(mock_os_exists, mock_path_exists, adapter):
-    # Arrange
-    mock_os_exists.return_value = True # Service account file exists
-    mock_path_exists.return_value = False # Upload file does NOT exist
-    
-    # Act & Assert
-    with pytest.raises(FileNotFoundError):
-        adapter.upload_file(Path("non_existent_file.xlsx"))
+class TestGoogleDriveAdapterUpload:
+
+    def test_upload_file_success(self, adapter, tmp_path):
+        """로컬 파일이 존재할 때 업로드가 성공해야 한다"""
+        # Given: 실제 파일 생성
+        local_file = tmp_path / "신규상장종목.xlsx"
+        local_file.write_bytes(b"dummy content")
+
+        # Given: 중복 검색 결과 없음, create 성공
+        mock_files = adapter._service.files.return_value
+        mock_files.list.return_value.execute.return_value = {"files": []}
+        mock_files.create.return_value.execute.return_value = {"id": "new_file_id"}
+
+        # When
+        with patch("infra.adapters.storage.google_drive_adapter.MediaFileUpload") as mock_media:
+            file_id = adapter.upload_file(local_file)
+
+        # Then
+        assert file_id == "new_file_id"
+        mock_files.create.assert_called_once()
+
+        call_kwargs = mock_files.create.call_args.kwargs
+        assert call_kwargs["body"]["name"] == "신규상장종목.xlsx"
+        assert call_kwargs["body"]["parents"] == ["test_folder_id"]
+
+    def test_upload_file_not_found(self, adapter, tmp_path):
+        """로컬 파일이 없을 때 FileNotFoundError가 발생해야 한다"""
+        missing = tmp_path / "missing.xlsx"
+
+        with pytest.raises(FileNotFoundError):
+            adapter.upload_file(missing)
+
+    def test_upload_updates_existing_file(self, adapter, tmp_path):
+        """같은 이름의 파일이 이미 있으면 update(덮어쓰기)를 호출해야 한다"""
+        local_file = tmp_path / "신규상장종목.xlsx"
+        local_file.write_bytes(b"updated content")
+
+        mock_files = adapter._service.files.return_value
+        mock_files.list.return_value.execute.return_value = {
+            "files": [{"id": "existing_id", "name": "신규상장종목.xlsx"}]
+        }
+        mock_files.update.return_value.execute.return_value = {"id": "existing_id"}
+
+        with patch("infra.adapters.storage.google_drive_adapter.MediaFileUpload"):
+            file_id = adapter.upload_file(local_file)
+
+        assert file_id == "existing_id"
+        mock_files.update.assert_called_once()
+        mock_files.create.assert_not_called()
+
+
+class TestGoogleDriveAdapterListFiles:
+
+    def test_list_files_returns_all_pages(self, adapter):
+        """페이지네이션 처리로 전체 파일 목록을 반환해야 한다"""
+        page1 = {"files": [{"id": "1", "name": "a.xlsx"}], "nextPageToken": "tok"}
+        page2 = {"files": [{"id": "2", "name": "b.xlsx"}]}
+
+        mock_files = adapter._service.files.return_value
+        mock_files.list.return_value.execute.side_effect = [page1, page2]
+
+        result = adapter.list_files()
+
+        assert len(result) == 2
+        assert result[0]["id"] == "1"
+        assert result[1]["id"] == "2"
+
+    def test_list_files_empty(self, adapter):
+        """파일이 없을 때 빈 리스트를 반환해야 한다"""
+        mock_files = adapter._service.files.return_value
+        mock_files.list.return_value.execute.return_value = {"files": []}
+
+        result = adapter.list_files()
+        assert result == []
