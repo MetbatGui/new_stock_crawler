@@ -136,7 +136,8 @@ class CrawlerService:
         # 수집할 날짜 리스트 생성
         target_dates = [start_date + timedelta(days=i) for i in range(days_ahead + 1)]
         
-        yearly_data: Dict[int, pd.DataFrame] = {}
+        from collections import defaultdict
+        year_frames: Dict[int, list] = defaultdict(list)
         total_collected = 0
         
         for target_date in target_dates:
@@ -200,19 +201,17 @@ class CrawlerService:
             df = self.data_mapper.to_dataframe(enriched_details)
             
             if not df.empty:
-                # 연도별 데이터 병합
-                if year in yearly_data:
-                    yearly_data[year] = pd.concat([yearly_data[year], df], ignore_index=True)
-                else:
-                    yearly_data[year] = df
+                year_frames[year].append(df)
                 
                 total_collected += len(df)
                 self.logger.info(f"[{target_date}] {len(df)}건 처리 완료")
         
-        # 데이터 저장 (Parquet upsert)
-        if yearly_data:
-            for year, df in yearly_data.items():
-                self.repository.save(year, df)
+        # 데이터 병합 및 저장 (Parquet upsert)
+        yearly_data: Dict[int, pd.DataFrame] = {}
+        if year_frames:
+            for year, dfs in year_frames.items():
+                yearly_data[year] = pd.concat(dfs, ignore_index=True)
+                self.repository.save(year, yearly_data[year])
             self.logger.info(f"총 {total_collected}건 저장 완료")
         else:
             self.logger.info("수집된 데이터 없음")

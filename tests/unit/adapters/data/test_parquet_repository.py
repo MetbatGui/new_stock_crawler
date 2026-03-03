@@ -86,3 +86,32 @@ class TestParquetRepository:
 
         years = repo.get_available_years()
         assert years == [2023, 2024, 2025]
+
+    def test_save_atomic_write_failure_preserves_original(
+        self, repo: ParquetRepository, sample_df: pd.DataFrame
+    ):
+        """to_parquet 저장 도중 에러가 발생하면 기존 파일이 보존되어야 한다"""
+        from unittest.mock import patch
+
+        repo.save(2024, sample_df)
+        path = repo._path(2024)
+        original_size = path.stat().st_size
+
+        new_df = pd.DataFrame({
+            "종목명": ["에러종목"],
+            "상장일": ["2024-12-31"],
+            "확정공모가": [1000]
+        })
+
+        # to_parquet에서 예외 발생 시뮬레이션
+        with patch("pandas.DataFrame.to_parquet", side_effect=Exception("Disk Full")):
+            with pytest.raises(Exception, match="Disk Full"):
+                repo.save(2024, new_df)
+
+        # 1. 원본 파일이 그대로 남아있어야 함
+        assert path.exists()
+        assert path.stat().st_size == original_size
+
+        # 2. 임시 파일(.parquet.tmp)이 삭제되어야 함
+        tmp_file = path.with_suffix(".parquet.tmp")
+        assert not tmp_file.exists()

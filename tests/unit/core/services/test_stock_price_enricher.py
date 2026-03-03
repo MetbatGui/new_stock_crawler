@@ -94,4 +94,4 @@ class TestStockPriceEnricher:
         # Then
         assert result['시가'] == 2000
         assert result['종가'] == 2100
-        assert result['수익률'] == 40.0
+        assert result['수익률(%)'] == 40.0

@@ -2,16 +2,16 @@
 주가 정보 보강 서비스
 """
 from datetime import date
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from dataclasses import replace
 import pandas as pd
 
 from core.domain.models import StockInfo
-from core.ports.enrichment_ports import TickerMapperPort, MarketDataProviderPort
+from core.ports.enrichment_ports import TickerMapperPort, MarketDataProviderPort, StockEnricherPort
 from core.ports.utility_ports import LoggerPort
 
 
-class StockPriceEnricher:
+class StockPriceEnricher(StockEnricherPort):
     """
     주가 정보(OHLC) 및 수익률 계산 로직을 담당하는 도메인 서비스
     """
@@ -79,8 +79,9 @@ class StockPriceEnricher:
         """
         종목명, 상장일, 공모가를 받아 OHLC 및 수익률 딕셔너리 반환 (EnrichmentService용)
         """
+        # EnrichmentService용 OHLC 및 수익률 딕셔너리 반환
         result = {
-            '시가': None, '고가': None, '저가': None, '종가': None, '수익률': None
+            '시가': None, '고가': None, '저가': None, '종가': None, '수익률(%)': None
         }
 
         try:
@@ -117,7 +118,7 @@ class StockPriceEnricher:
             confirmed_price = self._parse_price(confirmed_price_val)
             if confirmed_price:
                 growth_rate = self._calculate_growth_rate(ohlc['Close'], confirmed_price)
-                result['수익률'] = growth_rate
+                result['수익률(%)'] = growth_rate
                 self.logger.info(f"    - [OK] {stock_name} ({ticker}): 수익률 {growth_rate}%")
             else:
                  self.logger.info(f"    - [WARN] 공모가 변환 실패: {stock_name} ({confirmed_price_val})")

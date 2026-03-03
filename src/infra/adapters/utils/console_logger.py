@@ -25,32 +25,29 @@ class ConsoleLogger(LoggerPort):
     - 향후 파일 핸들러/구조화 로거로 교체 가능
     """
 
-    _root_logger_configured: bool = False
-
     def __init__(self, name: str = "crawler") -> None:
         self._logger = logging.getLogger(name)
 
-        if not ConsoleLogger._root_logger_configured:
-            self._configure_root()
-            ConsoleLogger._root_logger_configured = True
+        # 핸들러 중복 추가 방지
+        if not self._logger.handlers:
+            self._configure_logger()
 
-    @staticmethod
-    def _configure_root() -> None:
-        """루트 로거 핸들러 설정 (1회만 실행)"""
+    def _configure_logger(self) -> None:
+        """인스턴스별 로거 핸들러 설정"""
         import sys
         import io
 
         level = _get_log_level()
 
-        # Windows CP949 환경에서 이모지 포함 메시지도 출력 가능하도록 UTF-8 강제
-        utf8_stdout = io.TextIOWrapper(
-            sys.stdout.buffer,
-            encoding="utf-8",
-            errors="replace",
-            line_buffering=True,
-        )
+        # Windows CP949 환경 이모지 출력 대비 UTF-8 설정
+        # pytest 캡처 환경에서는 reconfigure가 없거나 실패할 수 있으므로 안전하게 처리
+        if hasattr(sys.stdout, "reconfigure"):
+            try:
+                sys.stdout.reconfigure(encoding="utf-8")
+            except Exception:
+                pass
 
-        handler = logging.StreamHandler(utf8_stdout)
+        handler = logging.StreamHandler(sys.stdout)
         handler.setLevel(level)
 
         fmt = logging.Formatter(
@@ -59,11 +56,9 @@ class ConsoleLogger(LoggerPort):
         )
         handler.setFormatter(fmt)
 
-        root = logging.getLogger()
-        root.setLevel(level)
-        # 핸들러 중복 추가 방지
-        if not root.handlers:
-            root.addHandler(handler)
+        self._logger.setLevel(level)
+        self._logger.addHandler(handler)
+        self._logger.propagate = False
 
     def info(self, message: str) -> None:
         """정보 로그"""

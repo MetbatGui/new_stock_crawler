@@ -4,9 +4,13 @@ Parquet 기반 저장소 어댑터 구현
 from pathlib import Path
 from typing import Dict, List
 import pandas as pd
+import os
+import logging
 
 from core.ports.repository_ports import RepositoryPort
 from config import config
+
+logger = logging.getLogger("crawler")
 
 
 class ParquetRepository(RepositoryPort):
@@ -60,12 +64,21 @@ class ParquetRepository(RepositoryPort):
         pk_cols = [c for c in self._PK_COLS if c in combined.columns]
         if pk_cols:
             combined = combined.drop_duplicates(subset=pk_cols, keep="last")
+        else:
+            logger.warning("PK 컬럼이 없어 중복 제거를 건너뜁니다. (데이터 중복 우려)")
 
         # 상장일 기준 오름차순 정렬
         if "상장일" in combined.columns:
             combined = combined.sort_values("상장일", ascending=True)
 
-        combined.to_parquet(path, index=False, engine="pyarrow")
+        tmp_path = path.with_suffix(".parquet.tmp")
+        try:
+            combined.to_parquet(tmp_path, index=False, engine="pyarrow")
+            os.replace(tmp_path, path)
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            raise
 
     # ------------------------------------------------------------------ #
     #  Read                                                                #

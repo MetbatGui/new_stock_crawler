@@ -23,6 +23,11 @@ class ExcelRenderer:
         - 기존 파일 병합 (호출자가 load_all()로 준비해서 넘김)
     """
 
+    MAX_SAMPLE_ROWS = 200
+    CHAR_WIDTH_RATIO = 0.8
+    MIN_COLUMN_WIDTH = 10
+    MAX_COLUMN_WIDTH = 50
+
     def render(self, data: Dict[int, pd.DataFrame], output_path: Path) -> None:
         """
         연도별 DataFrame을 Excel 파일로 렌더링
@@ -63,12 +68,12 @@ class ExcelRenderer:
         for idx, col in enumerate(df.columns):
             max_len = len(str(col))
 
-            sample_values = df[col].astype(str).head(50)
+            sample_values = df[col].astype(str).head(self.MAX_SAMPLE_ROWS)
             if not sample_values.empty:
                 max_data_len = sample_values.map(
                     lambda x: len(str(x).encode("utf-8"))
                 ).max()
-                max_len = max(max_len, int(max_data_len * 0.8))
+                max_len = max(max_len, int(max_data_len * self.CHAR_WIDTH_RATIO))
 
-            width = min(max(max_len + 2, 10), 50)
+            width = min(max(max_len + 2, self.MIN_COLUMN_WIDTH), self.MAX_COLUMN_WIDTH)
             worksheet.column_dimensions[get_column_letter(idx + 1)].width = width

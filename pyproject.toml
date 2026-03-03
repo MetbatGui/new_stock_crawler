@@ -17,6 +17,7 @@ dependencies = [
     "pydantic>=2.9.0",
     "pydantic-settings>=2.12.0",
     "pykrx>=1.0.51",
+    "ruff>=0.15.4",
     "setuptools>=80.9.0",
     "typer>=0.9.0",
 ]

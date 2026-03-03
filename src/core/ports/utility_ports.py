@@ -25,7 +25,13 @@ class DateRangeCalculatorPort(ABC):
     
     @abstractmethod
     def calculate(self, start_year: int, reference_date: date) -> Dict[int, DateRange]:
-        """연도별 크롤링 범위 계산"""
+        """
+        연도별 크롤링 범위 계산
+        
+        Contract:
+            반환되는 Dict의 키(연도) 순서는 반드시 오름차순이어야 합니다.
+            호출자(CrawlerService 등)는 이 순서를 데이터 병합 순서로 신뢰합니다.
+        """
         pass
 
 

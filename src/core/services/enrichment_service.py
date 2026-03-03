@@ -1,6 +1,6 @@
 from typing import Dict
 import pandas as pd
-from core.services.stock_price_enricher import StockPriceEnricher
+from core.ports.enrichment_ports import StockEnricherPort
 from core.ports.utility_ports import LoggerPort
 from core.ports.repository_ports import RepositoryPort
 
@@ -14,7 +14,7 @@ class EnrichmentService:
 
     def __init__(
         self,
-        stock_enricher: StockPriceEnricher,
+        stock_enricher: StockEnricherPort,
         repository: RepositoryPort,
         logger: LoggerPort,
     ):
@@ -38,9 +38,10 @@ class EnrichmentService:
             if df.empty:
                 continue
 
+            df = df.copy()
             self.logger.info(f"[{year}년] 데이터 보강 중... ({len(df)}건)")
 
-            new_cols = ["시가", "고가", "저가", "종가", "수익률"]
+            new_cols = ["시가", "고가", "저가", "종가", "수익률(%)"]
             for col in new_cols:
                 if col not in df.columns:
                     df[col] = None
@@ -65,8 +66,8 @@ class EnrichmentService:
                         df.at[index, "저가"] = market_data["저가"]
                         df.at[index, "종가"] = market_data["종가"]
 
-                        if market_data["수익률"] is not None:
-                            df.at[index, "수익률"] = market_data["수익률"]
+                        if market_data["수익률(%)"] is not None:
+                            df.at[index, "수익률(%)"] = market_data["수익률(%)"]
                             total_enriched += 1
 
                 except Exception as e:

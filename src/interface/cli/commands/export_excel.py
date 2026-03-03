@@ -57,7 +57,13 @@ def export_excel(
         logger.info(f"전체 {len(data)}개 연도, {total}건 로드")
 
     # 출력 경로 결정
-    output_path = output or config.get_output_path(config.get_default_filename())
+    if output:
+        output_path = Path(output)
+    else:
+        output_path = config.OUTPUT_DIR / "신규상장종목.xlsx"
+    
+    # 출력 디렉토리 생성 보장
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # 렌더링
     renderer.render(data, output_path)
@@ -71,6 +77,8 @@ def export_excel(
             file_id = storage.upload_file(output_path)
             logger.info(f"☁️  Google Drive 업로드 완료 (ID: {file_id})")
         except Exception as e:
-            logger.warning(f"⚠️  Google Drive 업로드 실패: {e}")
+            logger.error(f"⚠️  Google Drive 업로드 실패: {e}")
+            logger.info("=" * 60)
+            raise typer.Exit(code=1)
 
     logger.info("=" * 60)
