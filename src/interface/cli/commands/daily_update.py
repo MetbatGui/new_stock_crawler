@@ -7,6 +7,7 @@ from datetime import date, datetime
 from typing import Optional
 from config import config
 from interface.cli.dependencies import build_dependencies
+from interface.cli.drive_sync import sync_changed_years_to_drive
 
 
 def daily_update(
@@ -19,6 +20,9 @@ def daily_update(
     headless: bool = typer.Option(
         config.HEADLESS, "--headless/--no-headless", help="헤드리스 모드"
     ),
+    drive: bool = typer.Option(
+        False, "--drive", help="변경된 연도의 Excel/DB를 Google Drive로 업로드"
+    ),
 ):
     """
     일일 업데이트 (GitHub Actions용)
@@ -27,7 +31,6 @@ def daily_update(
     당해연도(1월이면 전년도까지) 데이터를 대상으로 OHLC 가격 백필을 수행합니다.
 
     Excel 내보내기: uv run crawler export-excel
-    Drive 업로드:  uv run crawler export-excel --drive
     """
     # 날짜 파싱
     if target_date:
@@ -64,7 +67,14 @@ def daily_update(
         if date.today().month == 1:
             backfill_years.append(date.today().year - 1)
         backfill_data = {y: deps["repository"].load(y) for y in backfill_years}
-        deps["enrichment"].enrich_data(backfill_data)
+        enriched_years = deps["enrichment"].enrich_data(backfill_data)
+
+        changed_years = set(new_data.keys()) | enriched_years
+        if drive and changed_years:
+            deps["logger"].info(f"☁️  Drive 동기화 대상 연도: {sorted(changed_years)}")
+            sync_changed_years_to_drive(
+                deps["repository"], changed_years, deps["logger"]
+            )
 
         deps["logger"].info("🏁 일일 업데이트 완료")
         deps["logger"].info("💡 Excel 내보내기: uv run crawler export-excel")

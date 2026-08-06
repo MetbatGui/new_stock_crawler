@@ -103,25 +103,25 @@ class TestGoogleDriveAdapterSubfolder:
         call_kwargs = mock_files.create.call_args.kwargs
         assert call_kwargs["body"]["parents"] == ["db_folder_id"]
 
-    def test_get_or_create_subfolder_returns_existing(self, adapter):
+    def testget_or_create_subfolder_returns_existing(self, adapter):
         """같은 이름의 폴더가 이미 있으면 새로 만들지 않고 그 ID를 반환해야 한다"""
         mock_files = adapter._service.files.return_value
         mock_files.list.return_value.execute.return_value = {
             "files": [{"id": "existing_folder_id", "name": "db"}]
         }
 
-        folder_id = adapter._get_or_create_subfolder("db")
+        folder_id = adapter.get_or_create_subfolder("db")
 
         assert folder_id == "existing_folder_id"
         mock_files.create.assert_not_called()
 
-    def test_get_or_create_subfolder_creates_when_missing(self, adapter):
+    def testget_or_create_subfolder_creates_when_missing(self, adapter):
         """같은 이름의 폴더가 없으면 새로 생성해야 한다"""
         mock_files = adapter._service.files.return_value
         mock_files.list.return_value.execute.return_value = {"files": []}
         mock_files.create.return_value.execute.return_value = {"id": "new_folder_id"}
 
-        folder_id = adapter._get_or_create_subfolder("db")
+        folder_id = adapter.get_or_create_subfolder("db")
 
         assert folder_id == "new_folder_id"
         call_kwargs = mock_files.create.call_args.kwargs

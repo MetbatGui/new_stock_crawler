@@ -1,5 +1,5 @@
 from datetime import datetime, time
-from typing import Dict
+from typing import Dict, Set
 import pandas as pd
 from core.ports.enrichment_ports import StockEnricherPort
 from core.ports.utility_ports import LoggerPort
@@ -27,23 +27,28 @@ class EnrichmentService:
         self.repository = repository
         self.logger = logger
 
-    def enrich_data(self, yearly_data: Dict[int, pd.DataFrame]) -> None:
+    def enrich_data(self, yearly_data: Dict[int, pd.DataFrame]) -> Set[int]:
         """
         데이터 보강 및 저장소에 upsert
 
         Args:
             yearly_data: {연도: DataFrame} 로드된 기존 데이터
+
+        Returns:
+            실제로 1건 이상 갱신되어 저장까지 이어진 연도 집합
         """
         self.logger.info("=" * 60)
         self.logger.info("📈 데이터 보강 작업 시작 (OHLC, 성장률)")
 
         total_enriched = 0
+        changed_years: Set[int] = set()
 
         for year, df in yearly_data.items():
             if df.empty:
                 continue
 
             df = df.copy()
+            year_changed = False
             self.logger.info(f"[{year}년] 데이터 보강 중... ({len(df)}건)")
 
             new_cols = ["시가", "고가", "저가", "종가", "수익률(%)"]
@@ -78,6 +83,7 @@ class EnrichmentService:
                         df.at[index, "고가"] = market_data["고가"]
                         df.at[index, "저가"] = market_data["저가"]
                         df.at[index, "종가"] = market_data["종가"]
+                        year_changed = True
 
                         if market_data["수익률(%)"] is not None:
                             df.at[index, "수익률(%)"] = market_data["수익률(%)"]
@@ -88,11 +94,14 @@ class EnrichmentService:
                         f"    - [ERROR] {row.get('종목명', 'Unknown')} 처리 중 오류: {e}"
                     )
 
-            # SQLite upsert (보강된 연도 데이터만 저장)
-            self.repository.save(year, df)
+            # 실제로 갱신된 연도만 SQLite upsert
+            if year_changed:
+                self.repository.save(year, df)
+                changed_years.add(year)
 
         self.logger.info(f"✅ 데이터 보강 완료 (총 {total_enriched}건 시세 추가됨)")
         self.logger.info("=" * 60)
+        return changed_years
 
     def _is_past_cutoff(self, listing_date_val) -> bool:
         """상장일 15:50 컷오프가 지났는지 확인 (장마감 후 시세 확정 대기 버퍼)"""

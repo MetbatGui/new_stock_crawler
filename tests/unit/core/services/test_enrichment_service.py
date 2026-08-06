@@ -61,10 +61,10 @@ class TestEnrichmentService:
         )
         assert svc.stock_enricher is mock_enricher
 
-    def test_enrich_data_calls_repository_save_per_year(
+    def test_enrich_data_skips_save_when_nothing_changed(
         self, service, mock_enricher, mock_repository, sample_yearly_data
     ):
-        """연도별로 repository.save()가 1회씩 호출되어야 한다"""
+        """get_market_data가 아무것도 못 채웠으면 save()를 호출하지 않고 changed_years도 비어야 한다"""
         mock_enricher.get_market_data.return_value = {
             "시가": None,
             "고가": None,
@@ -73,11 +73,39 @@ class TestEnrichmentService:
             "수익률(%)": None,
         }
 
-        service.enrich_data(sample_yearly_data)
+        changed_years = service.enrich_data(sample_yearly_data)
+
+        mock_repository.save.assert_not_called()
+        assert changed_years == set()
+
+    def test_enrich_data_saves_and_returns_changed_year(
+        self, service, mock_enricher, mock_repository
+    ):
+        """실제로 갱신된 연도만 save()가 호출되고 반환값에 포함되어야 한다"""
+        mock_enricher.get_market_data.return_value = {
+            "시가": 10000,
+            "고가": 11000,
+            "저가": 9500,
+            "종가": 10500,
+            "수익률(%)": 5.0,
+        }
+
+        yearly_data = {
+            2024: pd.DataFrame(
+                {
+                    "종목명": ["주식A"],
+                    "상장일": ["2024-01-15"],
+                    "확정공모가": [10000],
+                }
+            )
+        }
+
+        changed_years = service.enrich_data(yearly_data)
 
         mock_repository.save.assert_called_once()
         saved_year = mock_repository.save.call_args[0][0]
         assert saved_year == 2024
+        assert changed_years == {2024}
 
     def test_enrich_data_skips_empty_year(
         self, service, mock_enricher, mock_repository
@@ -123,12 +151,13 @@ class TestEnrichmentService:
         mock_enricher.get_market_data.side_effect = Exception("API Error")
 
         # 예외가 전파되지 않아야 함
-        service.enrich_data(sample_yearly_data)
+        changed_years = service.enrich_data(sample_yearly_data)
 
         # 에러 로그는 찍혀야 함
         mock_logger.error.assert_called()
-        # 저장은 여전히 호출되어야 함
-        mock_repository.save.assert_called_once()
+        # 아무 행도 갱신되지 않았으므로 저장은 호출되지 않아야 함
+        mock_repository.save.assert_not_called()
+        assert changed_years == set()
 
     def test_no_missing_stock_name_skips_silently(
         self, service, mock_enricher, mock_repository

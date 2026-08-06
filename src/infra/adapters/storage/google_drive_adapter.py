@@ -136,7 +136,7 @@ class GoogleDriveAdapter(StoragePort):
             )
             return file.get("id")
 
-    def _get_or_create_subfolder(self, name: str) -> str:
+    def get_or_create_subfolder(self, name: str) -> str:
         """`self.folder_id` 하위에서 이름이 `name`인 폴더를 찾고, 없으면 생성해 ID를 반환"""
         self._authenticate()
         assert self._service is not None

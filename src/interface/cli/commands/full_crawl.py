@@ -6,12 +6,16 @@ import typer
 from datetime import date
 from config import config
 from interface.cli.dependencies import build_dependencies
+from interface.cli.drive_sync import sync_changed_years_to_drive
 
 
 def full_crawl(
     start_year: int = typer.Option(2020, "--start-year", "-s", help="크롤링 시작 연도"),
     headless: bool = typer.Option(
         config.HEADLESS, "--headless/--no-headless", help="헤드리스 모드"
+    ),
+    drive: bool = typer.Option(
+        False, "--drive", help="변경된 연도의 Excel/DB를 Google Drive로 업로드"
     ),
 ):
     """
@@ -32,10 +36,17 @@ def full_crawl(
         deps["logger"].info("=" * 60)
 
         deps["page_provider"].setup()
-        deps["crawler"].run(start_year=start_year)
+        crawl_result = deps["crawler"].run(start_year=start_year)
 
         # 저장된 전체 연도를 대상으로 OHLC 가격 백필 (DB 상태 기준으로 누락분만 채움)
-        deps["enrichment"].enrich_data(deps["repository"].load_all())
+        enriched_years = deps["enrichment"].enrich_data(deps["repository"].load_all())
+
+        changed_years = set(crawl_result.keys()) | enriched_years
+        if drive and changed_years:
+            deps["logger"].info(f"☁️  Drive 동기화 대상 연도: {sorted(changed_years)}")
+            sync_changed_years_to_drive(
+                deps["repository"], changed_years, deps["logger"]
+            )
 
         deps["logger"].info("=" * 60)
         deps["logger"].info("🏁 크롤링 완료 → SQLite 저장됨")
