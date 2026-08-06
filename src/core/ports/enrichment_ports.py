@@ -6,8 +6,6 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 from datetime import date
 
-from core.domain.models import StockInfo
-
 
 class TickerMapperPort(ABC):
     """종목명으로 티커(종목코드)를 조회하는 포트"""
@@ -41,11 +39,6 @@ class StockEnricherPort(ABC):
     `EnrichmentService`가 `StockPriceEnricher` 구체 타입 대신
     이 인터페이스를 의존함으로써 코어 레이어와 인프라를 분리합니다.
     """
-
-    @abstractmethod
-    def enrich_stock_info(self, stock: StockInfo) -> StockInfo:
-        """StockInfo에 OHLC 및 수익률 보강 후 반환"""
-        pass
 
     @abstractmethod
     def get_market_data(

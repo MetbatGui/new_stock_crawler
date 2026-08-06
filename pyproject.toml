@@ -43,3 +43,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "live: 실제 외부 서비스(KRX 등)에 네트워크로 접속 - 기본 실행에서 제외됨",
+]
+addopts = '-m "not live"'

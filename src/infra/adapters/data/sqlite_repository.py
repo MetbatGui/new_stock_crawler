@@ -1,41 +1,39 @@
 """
-Parquet 기반 저장소 어댑터 구현
+SQLite 기반 저장소 어댑터 구현
 """
 
+import os
+import sqlite3
 from pathlib import Path
 from typing import Dict, List, Optional
+
 import pandas as pd
-import os
-import logging
 
-from core.ports.repository_ports import RepositoryPort
 from config import config
+from core.ports.repository_ports import RepositoryPort
 
-logger = logging.getLogger("crawler")
 
-
-class ParquetRepository(RepositoryPort):
+class SqliteRepository(RepositoryPort):
     """
-    Parquet 파일 기반 IPO 데이터 저장소
+    SQLite 파일 기반 IPO 데이터 저장소 (연도별 DB 파일 분리)
 
     레이아웃:
-        {OUTPUT_DIR}/parquet/{year}.parquet
+        {DB_DIR}/{year}.db, 테이블명 "stocks"
 
     upsert 전략:
-        (종목명, 상장일) 복합키 기준 중복 제거.
+        종목명 단일키 기준 중복 제거 (상장일은 정정될 수 있어 PK에서 제외).
         신규 데이터가 기존 데이터보다 우선(keep='last').
     """
 
-    SUBDIR = "parquet"
-    # 중복 제거에 사용할 복합 PK
-    _PK_COLS = ["종목명", "상장일"]
+    TABLE = "stocks"
+    _PK_COLS = ["종목명"]
 
     def __init__(self, base_dir: Optional[Path] = None) -> None:
-        self._base_dir: Path = (base_dir or config.OUTPUT_DIR) / self.SUBDIR
+        self._base_dir: Path = base_dir or config.DB_DIR
         self._base_dir.mkdir(parents=True, exist_ok=True)
 
     def _path(self, year: int) -> Path:
-        return self._base_dir / f"{year}.parquet"
+        return self._base_dir / f"{year}.db"
 
     # ------------------------------------------------------------------ #
     #  Write                                                               #
@@ -43,7 +41,7 @@ class ParquetRepository(RepositoryPort):
 
     def save(self, year: int, df: pd.DataFrame) -> None:
         """
-        연도별 데이터를 Parquet으로 upsert 저장
+        연도별 데이터를 SQLite로 upsert 저장
 
         Args:
             year: 저장 대상 연도
@@ -55,26 +53,34 @@ class ParquetRepository(RepositoryPort):
         path = self._path(year)
 
         # 기존 파일이 있으면 로드 후 병합
-        if path.exists():
-            existing = pd.read_parquet(path)
-            combined = pd.concat([existing, df], ignore_index=True)
-        else:
-            combined = df.copy()
+        existing = self.load(year)
+        combined = (
+            pd.concat([existing, df], ignore_index=True)
+            if not existing.empty
+            else df.copy()
+        )
 
-        # (종목명, 상장일) 복합키 기준 중복 제거 — 신규 우선
+        # 종목명 단일 PK 기준 중복 제거 — 신규 우선
         pk_cols = [c for c in self._PK_COLS if c in combined.columns]
         if pk_cols:
             combined = combined.drop_duplicates(subset=pk_cols, keep="last")
-        else:
-            logger.warning("PK 컬럼이 없어 중복 제거를 건너뜁니다. (데이터 중복 우려)")
 
         # 상장일 기준 오름차순 정렬
         if "상장일" in combined.columns:
             combined = combined.sort_values("상장일", ascending=True)
 
-        tmp_path = path.with_suffix(".parquet.tmp")
+        tmp_path = path.with_suffix(".db.tmp")
         try:
-            combined.to_parquet(tmp_path, index=False, engine="pyarrow")
+            conn = sqlite3.connect(tmp_path)
+            try:
+                combined.to_sql(self.TABLE, conn, if_exists="replace", index=False)
+                conn.execute(
+                    f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{self.TABLE}_name "
+                    f'ON {self.TABLE}("종목명")'
+                )
+                conn.commit()
+            finally:
+                conn.close()
             os.replace(tmp_path, path)
         except Exception:
             if tmp_path.exists():
@@ -95,7 +101,11 @@ class ParquetRepository(RepositoryPort):
         path = self._path(year)
         if not path.exists():
             return pd.DataFrame()
-        return pd.read_parquet(path, engine="pyarrow")
+        conn = sqlite3.connect(path)
+        try:
+            return pd.read_sql(f'SELECT * FROM {self.TABLE} ORDER BY "상장일"', conn)
+        finally:
+            conn.close()
 
     def load_all(self) -> Dict[int, pd.DataFrame]:
         """전체 연도 데이터 로드"""
@@ -107,7 +117,7 @@ class ParquetRepository(RepositoryPort):
     def get_available_years(self) -> List[int]:
         """저장된 연도 목록 반환 (오름차순)"""
         years = []
-        for p in self._base_dir.glob("*.parquet"):
+        for p in self._base_dir.glob("*.db"):
             try:
                 years.append(int(p.stem))
             except ValueError:

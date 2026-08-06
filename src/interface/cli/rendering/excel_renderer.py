@@ -20,7 +20,7 @@ class ExcelRenderer:
         - 상장일 기준 오름차순 정렬
 
     역할 아님:
-        - 데이터 저장 (RepositoryPort / ParquetRepository 역할)
+        - 데이터 저장 (RepositoryPort / SqliteRepository 역할)
         - 기존 파일 병합 (호출자가 load_all()로 준비해서 넘김)
     """
 
