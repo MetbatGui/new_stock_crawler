@@ -32,25 +32,24 @@ def sync_changed_years_to_drive(
 
         excel_path = config.OUTPUT_DIR / f"신규상장종목({year}년).xlsx"
         renderer.render({year: df}, excel_path)
-        try:
-            file_id = storage.upload_file(excel_path)
+        file_id = storage.upload_file(excel_path)
+        if file_id:
             logger.info(f"   ☁️  [{year}년] Excel Drive 업로드 완료 (ID: {file_id})")
-        except Exception as e:
-            logger.error(f"   ⚠️  [{year}년] Excel Drive 업로드 실패: {e}")
+        else:
+            logger.error(f"   ⚠️  [{year}년] Excel Drive 업로드 실패")
 
     # 2. db/{year}.db 나중 (db 서브폴더로)
-    try:
-        db_folder_id = storage.get_or_create_subfolder("db")
-    except Exception as e:
-        logger.error(f"   ⚠️  Google Drive db 서브폴더 조회/생성 실패: {e}")
+    db_folder_id = storage.get_or_create_subfolder("db")
+    if db_folder_id is None:
+        logger.error("   ⚠️  Google Drive db 서브폴더 조회/생성 실패 — DB 업로드 건너뜀")
         return
 
     for year in sorted(years):
         db_path = config.DB_DIR / f"{year}.db"
         if not db_path.exists():
             continue
-        try:
-            file_id = storage.upload_file(db_path, parent_folder_id=db_folder_id)
+        file_id = storage.upload_file(db_path, parent_folder_id=db_folder_id)
+        if file_id:
             logger.info(f"   ☁️  [{year}년] DB Drive 업로드 완료 (ID: {file_id})")
-        except Exception as e:
-            logger.error(f"   ⚠️  [{year}년] DB Drive 업로드 실패: {e}")
+        else:
+            logger.error(f"   ⚠️  [{year}년] DB Drive 업로드 실패")

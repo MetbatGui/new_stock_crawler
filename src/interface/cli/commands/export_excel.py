@@ -80,12 +80,12 @@ def export_excel(
 
         storage = GoogleDriveAdapter()
         for path in generated_paths:
-            try:
-                file_id = storage.upload_file(path)
+            file_id = storage.upload_file(path)
+            if file_id:
                 logger.info(
                     f"   ☁️  Google Drive 업로드 완료: {path.name} (ID: {file_id})"
                 )
-            except Exception as e:
-                logger.error(f"   ⚠️  Google Drive 업로드 실패: {path.name} - {e}")
+            else:
+                logger.error(f"   ⚠️  Google Drive 업로드 실패: {path.name}")
 
     logger.info("=" * 60)

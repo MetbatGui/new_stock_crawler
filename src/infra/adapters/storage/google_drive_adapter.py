@@ -66,12 +66,21 @@ class GoogleDriveAdapter(StoragePort):
 
         self._service = build("drive", "v3", credentials=self._creds)
 
+    def ensure_authenticated(self) -> None:
+        """인증을 시도하고 실패 시 예외를 그대로 raise한다 (연결 테스트/헬스체크 전용).
+
+        다른 public 메서드(upload_file/list_files/...)는 실패를 삼키고 안전한
+        값을 반환하지만, "지금 인증이 되는가"를 직접 확인하려는 호출자(auth/health
+        커맨드)는 실패를 명확히 알아야 하므로 별도로 노출한다.
+        """
+        self._authenticate()
+
     def upload_file(
         self,
         local_path: Path,
         remote_filename: Optional[str] = None,
         parent_folder_id: Optional[str] = None,
-    ) -> str:
+    ) -> Optional[str]:
         """
         파일을 Google Drive 폴더로 업로드 (이미 존재하면 덮어쓰기)
 
@@ -81,86 +90,100 @@ class GoogleDriveAdapter(StoragePort):
             parent_folder_id: 업로드할 상위 폴더 ID (기본값: self.folder_id 루트)
 
         Returns:
-            str: 업로드된 파일 ID
+            Optional[str]: 업로드된 파일 ID. 인증/API 실패 시 None
+            (로컬 파일이 없는 건 호출자 실수이므로 예외로 그대로 raise됨).
         """
-        self._authenticate()
-        assert self._service is not None
-
         local_path = Path(local_path)
         if not local_path.exists():
             raise FileNotFoundError(f"업로드할 파일을 찾을 수 없습니다: {local_path}")
 
-        file_name = remote_filename or local_path.name
-        target_folder_id = parent_folder_id or self.folder_id
+        try:
+            self._authenticate()
+            assert self._service is not None
 
-        # 1. 기존 파일 검색 (같은 폴더 내에서)
-        existing_files = self.list_files(
-            f"name = '{file_name}'", folder_id=target_folder_id
-        )
+            file_name = remote_filename or local_path.name
+            target_folder_id = parent_folder_id or self.folder_id
 
-        media = MediaFileUpload(str(local_path), resumable=True)
-
-        if existing_files:
-            # 2. 덮어쓰기 (Update)
-            file_id = existing_files[0]["id"]
-            print(f"      [Google Drive] 기존 파일 업데이트 중... (ID: {file_id})")
-
-            file = (
-                self._service.files()
-                .update(fileId=file_id, media_body=media, fields="id")
-                .execute()
+            # 1. 기존 파일 검색 (같은 폴더 내에서)
+            # list_files는 실패 시 예외 대신 빈 리스트를 반환하므로, 중복 검색 자체가
+            # 실패해도 업로드를 막지 않고 새 파일 생성으로 진행한다(드물게 중복 생성 가능).
+            existing_files = self.list_files(
+                f"name = '{file_name}'", folder_id=target_folder_id
             )
 
-            print(
-                f"      [Google Drive] 업데이트 완료: {file_name} (ID: {file.get('id')})"
+            media = MediaFileUpload(str(local_path), resumable=True)
+
+            if existing_files:
+                # 2. 덮어쓰기 (Update)
+                file_id = existing_files[0]["id"]
+                print(f"      [Google Drive] 기존 파일 업데이트 중... (ID: {file_id})")
+
+                file = (
+                    self._service.files()
+                    .update(fileId=file_id, media_body=media, fields="id")
+                    .execute()
+                )
+
+                print(
+                    f"      [Google Drive] 업데이트 완료: {file_name} (ID: {file.get('id')})"
+                )
+                return file.get("id")
+
+            else:
+                # 3. 새로 만들기 (Create)
+                print(f"      [Google Drive] 새 파일 업로드 중...: {file_name}")
+
+                file_metadata = {
+                    "name": file_name,
+                    "parents": [target_folder_id] if target_folder_id else [],
+                }
+
+                file = (
+                    self._service.files()
+                    .create(body=file_metadata, media_body=media, fields="id")
+                    .execute()
+                )
+
+                print(
+                    f"      [Google Drive] 업로드 완료: {file_name} (ID: {file.get('id')})"
+                )
+                return file.get("id")
+        except Exception as e:
+            print(f"      [Google Drive] 업로드 실패: {local_path.name} - {e}")
+            return None
+
+    def get_or_create_subfolder(self, name: str) -> Optional[str]:
+        """`self.folder_id` 하위에서 이름이 `name`인 폴더를 찾고, 없으면 생성해 ID를 반환.
+        인증/API 실패 시 None."""
+        try:
+            self._authenticate()
+            assert self._service is not None
+
+            q = (
+                f"name = '{name}' and mimeType = 'application/vnd.google-apps.folder' "
+                "and trashed = false"
             )
-            return file.get("id")
+            if self.folder_id:
+                q += f" and '{self.folder_id}' in parents"
 
-        else:
-            # 3. 새로 만들기 (Create)
-            print(f"      [Google Drive] 새 파일 업로드 중...: {file_name}")
+            results = (
+                self._service.files().list(q=q, fields="files(id, name)").execute()
+            )
+            found = results.get("files", [])
+            if found:
+                return found[0]["id"]
 
-            file_metadata = {
-                "name": file_name,
-                "parents": [target_folder_id] if target_folder_id else [],
+            metadata = {
+                "name": name,
+                "mimeType": "application/vnd.google-apps.folder",
+                "parents": [self.folder_id] if self.folder_id else [],
             }
-
-            file = (
-                self._service.files()
-                .create(body=file_metadata, media_body=media, fields="id")
-                .execute()
-            )
-
-            print(
-                f"      [Google Drive] 업로드 완료: {file_name} (ID: {file.get('id')})"
-            )
-            return file.get("id")
-
-    def get_or_create_subfolder(self, name: str) -> str:
-        """`self.folder_id` 하위에서 이름이 `name`인 폴더를 찾고, 없으면 생성해 ID를 반환"""
-        self._authenticate()
-        assert self._service is not None
-
-        q = (
-            f"name = '{name}' and mimeType = 'application/vnd.google-apps.folder' "
-            "and trashed = false"
-        )
-        if self.folder_id:
-            q += f" and '{self.folder_id}' in parents"
-
-        results = self._service.files().list(q=q, fields="files(id, name)").execute()
-        found = results.get("files", [])
-        if found:
-            return found[0]["id"]
-
-        metadata = {
-            "name": name,
-            "mimeType": "application/vnd.google-apps.folder",
-            "parents": [self.folder_id] if self.folder_id else [],
-        }
-        folder = self._service.files().create(body=metadata, fields="id").execute()
-        print(f"      [Google Drive] 서브폴더 생성: {name} (ID: {folder['id']})")
-        return folder["id"]
+            folder = self._service.files().create(body=metadata, fields="id").execute()
+            print(f"      [Google Drive] 서브폴더 생성: {name} (ID: {folder['id']})")
+            return folder["id"]
+        except Exception as e:
+            print(f"      [Google Drive] 서브폴더 조회/생성 실패: {name} - {e}")
+            return None
 
     def list_files(
         self, query: Optional[str] = None, folder_id: Optional[str] = None
@@ -173,61 +196,74 @@ class GoogleDriveAdapter(StoragePort):
             folder_id: 조회할 상위 폴더 ID (기본값: self.folder_id 루트)
 
         Returns:
-            list: 파일 메타데이터 리스트 [{'id': ..., 'name': ..., 'createdTime': ...}]
+            list: 파일 메타데이터 리스트 [{'id': ..., 'name': ..., 'createdTime': ...}].
+            인증/API 실패 시 빈 리스트.
         """
-        self._authenticate()
-        assert self._service is not None
+        try:
+            self._authenticate()
+            assert self._service is not None
 
-        target_folder_id = folder_id or self.folder_id
+            target_folder_id = folder_id or self.folder_id
 
-        q = "trashed = false"
-        if target_folder_id:
-            q += f" and '{target_folder_id}' in parents"
-        if query:
-            q += f" and ({query})"
+            q = "trashed = false"
+            if target_folder_id:
+                q += f" and '{target_folder_id}' in parents"
+            if query:
+                q += f" and ({query})"
 
-        all_files = []
-        page_token = None
+            all_files = []
+            page_token = None
 
-        while True:
-            kwargs: dict = {
-                "q": q,
-                "pageSize": 100,
-                "fields": "nextPageToken, files(id, name, createdTime)",
-                "orderBy": "createdTime desc",
-            }
-            if page_token:
-                kwargs["pageToken"] = page_token
+            while True:
+                kwargs: dict = {
+                    "q": q,
+                    "pageSize": 100,
+                    "fields": "nextPageToken, files(id, name, createdTime)",
+                    "orderBy": "createdTime desc",
+                }
+                if page_token:
+                    kwargs["pageToken"] = page_token
 
-            results = self._service.files().list(**kwargs).execute()
-            all_files.extend(results.get("files", []))
+                results = self._service.files().list(**kwargs).execute()
+                all_files.extend(results.get("files", []))
 
-            page_token = results.get("nextPageToken")
-            if not page_token:
-                break
+                page_token = results.get("nextPageToken")
+                if not page_token:
+                    break
 
-        print(
-            f"      [Google Drive] 파일 목록 조회 완료 (Query: {query}, Found: {len(all_files)}개)"
-        )
-        return all_files
+            print(
+                f"      [Google Drive] 파일 목록 조회 완료 (Query: {query}, Found: {len(all_files)}개)"
+            )
+            return all_files
+        except Exception as e:
+            print(f"      [Google Drive] 파일 목록 조회 실패: {e}")
+            return []
 
-    def download_file(self, file_id: str, local_path: Path) -> None:
+    def download_file(self, file_id: str, local_path: Path) -> bool:
         """
         파일 다운로드
 
         Args:
             file_id: 다운로드할 파일 ID
             local_path: 저장할 로컬 경로
+
+        Returns:
+            bool: 다운로드 성공 여부
         """
-        self._authenticate()
-        assert self._service is not None
+        try:
+            self._authenticate()
+            assert self._service is not None
 
-        request = self._service.files().get_media(fileId=file_id)
+            request = self._service.files().get_media(fileId=file_id)
 
-        with open(local_path, "wb") as f:
-            downloader = MediaIoBaseDownload(f, request)
-            done = False
-            while done is False:
-                status, done = downloader.next_chunk()
+            with open(local_path, "wb") as f:
+                downloader = MediaIoBaseDownload(f, request)
+                done = False
+                while done is False:
+                    status, done = downloader.next_chunk()
 
-        print(f"      [Google Drive] 다운로드 완료: {local_path}")
+            print(f"      [Google Drive] 다운로드 완료: {local_path}")
+            return True
+        except Exception as e:
+            print(f"      [Google Drive] 다운로드 실패: {file_id} - {e}")
+            return False

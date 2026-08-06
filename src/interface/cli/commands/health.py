@@ -84,6 +84,7 @@ def health_check():
             from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
 
             storage = GoogleDriveAdapter()
+            storage.ensure_authenticated()  # 실패 시 예외 발생 (list_files는 실패해도 빈 리스트 반환)
             files = storage.list_files()
             _check("Google Drive 연결", True)
             logger.info(f"       => 조회된 파일 수: {len(files)}개")

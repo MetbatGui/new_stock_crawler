@@ -71,18 +71,17 @@ class TestSyncChangedYearsToDrive:
     def test_subfolder_failure_is_caught_and_does_not_raise(
         self, mock_repository, mock_logger, drive_env
     ):
-        """db 서브폴더 조회/생성이 실패해도 예외가 전파되지 않아야 한다 (Excel 업로드는 이미 끝난 뒤)"""
+        """db 서브폴더 조회/생성이 실패(None 반환)해도 예외 없이 반환되어야 한다
+        (Excel 업로드는 이미 끝난 뒤). GoogleDriveAdapter는 인증/API 실패를
+        내부에서 삼키고 None을 반환하는 계약이라 여기서는 실제로 예외가 나지 않음."""
         with (
             patch("interface.cli.drive_sync.GoogleDriveAdapter") as mock_adapter_cls,
             patch("interface.cli.drive_sync.ExcelRenderer"),
         ):
             mock_storage = mock_adapter_cls.return_value
             mock_storage.upload_file.return_value = "excel_id"
-            mock_storage.get_or_create_subfolder.side_effect = FileNotFoundError(
-                "인증 토큰 없음"
-            )
+            mock_storage.get_or_create_subfolder.return_value = None
 
-            # 예외 없이 정상 반환되어야 함
             sync_changed_years_to_drive(mock_repository, {2024}, mock_logger)
 
             mock_logger.error.assert_called()
@@ -90,7 +89,7 @@ class TestSyncChangedYearsToDrive:
     def test_individual_upload_failure_does_not_stop_other_years(
         self, mock_repository, mock_logger, drive_env
     ):
-        """한 연도의 업로드가 실패해도 나머지 연도는 계속 처리되어야 한다"""
+        """한 연도의 업로드가 실패(None 반환)해도 나머지 연도는 계속 처리되어야 한다"""
         (drive_env["db_dir"] / "2025.db").write_bytes(b"dummy")
 
         with (
@@ -100,7 +99,7 @@ class TestSyncChangedYearsToDrive:
             mock_storage = mock_adapter_cls.return_value
             mock_storage.get_or_create_subfolder.return_value = "db_folder_id"
             mock_storage.upload_file.side_effect = [
-                Exception("업로드 실패"),
+                None,
                 "excel_id_2025",
                 "db_id_2024",
                 "db_id_2025",

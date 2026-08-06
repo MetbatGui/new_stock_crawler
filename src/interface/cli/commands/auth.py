@@ -67,6 +67,7 @@ def auth_drive():
         # 3. 연결 테스트
         console.print("\n[info]연결 테스트를 수행합니다...[/info]")
         storage = GoogleDriveAdapter()
+        storage.ensure_authenticated()  # 실패 시 예외 발생 (list_files는 실패해도 빈 리스트 반환)
         files = storage.list_files(query="trashed = false")
         console.print(
             f"  • [success]✅ 연결 확인됨[/success] (현재 드라이브 파일 수: {len(files)}개)"
