@@ -18,7 +18,7 @@ def full_crawl(
     전체 기간 크롤링 (초기 수집용)
 
     지정한 연도부터 현재까지의 모든 IPO 데이터를 수집하여
-    Parquet 저장소(output/parquet/)에 저장합니다.
+    SQLite 저장소(db/)에 저장한 뒤, 저장된 전체 연도를 대상으로 OHLC 가격 백필을 수행합니다.
 
     Excel 내보내기: uv run crawler export-excel
     """
@@ -34,8 +34,11 @@ def full_crawl(
         deps["page_provider"].setup()
         deps["crawler"].run(start_year=start_year)
 
+        # 저장된 전체 연도를 대상으로 OHLC 가격 백필 (DB 상태 기준으로 누락분만 채움)
+        deps["enrichment"].enrich_data(deps["repository"].load_all())
+
         deps["logger"].info("=" * 60)
-        deps["logger"].info("🏁 크롤링 완료 → Parquet 저장됨")
+        deps["logger"].info("🏁 크롤링 완료 → SQLite 저장됨")
         deps["logger"].info("💡 Excel 내보내기: uv run crawler export-excel")
         deps["logger"].info("=" * 60)
 

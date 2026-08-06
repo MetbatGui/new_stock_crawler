@@ -23,8 +23,8 @@ def daily_update(
     """
     일일 업데이트 (GitHub Actions용)
 
-    당일 + 향후 3일의 IPO 데이터를 크롤링하여
-    Parquet 저장소(output/parquet/)에 upsert합니다.
+    당일 + 향후 3일의 IPO 데이터를 크롤링하여 SQLite 저장소(db/)에 upsert한 뒤,
+    당해연도(1월이면 전년도까지) 데이터를 대상으로 OHLC 가격 백필을 수행합니다.
 
     Excel 내보내기: uv run crawler export-excel
     Drive 업로드:  uv run crawler export-excel --drive
@@ -55,9 +55,16 @@ def daily_update(
 
         if new_data:
             total_count = sum(len(df) for df in new_data.values())
-            deps["logger"].info(f"✅ 총 {total_count}건 Parquet 저장 완료")
+            deps["logger"].info(f"✅ 총 {total_count}건 SQLite 저장 완료")
         else:
             deps["logger"].info("ℹ️  수집된 상장 정보 없음")
+
+        # 당해연도(1월이면 전년도 포함) OHLC 가격 백필 — DB 상태 기준으로 누락분만 채움
+        backfill_years = [date.today().year]
+        if date.today().month == 1:
+            backfill_years.append(date.today().year - 1)
+        backfill_data = {y: deps["repository"].load(y) for y in backfill_years}
+        deps["enrichment"].enrich_data(backfill_data)
 
         deps["logger"].info("🏁 일일 업데이트 완료")
         deps["logger"].info("💡 Excel 내보내기: uv run crawler export-excel")
