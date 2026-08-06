@@ -32,7 +32,7 @@ class StockInfo:
     # 2차 수집: 공모청약일정 (Table 3)
     listing_date: str  # 상장일
     competition_rate: str  # 기관경쟁률
-    emp_shares: int  # 우리사주조합
+    emp_shares: int | None  # 우리사주조합
     inst_shares: int | None  # 기관투자자
     retail_shares: int | None  # 일반청약자
 

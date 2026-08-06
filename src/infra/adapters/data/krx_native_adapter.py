@@ -1,4 +1,4 @@
-import requests  # type: ignore
+import requests
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import date, timedelta
@@ -153,7 +153,7 @@ class KrxNativeAdapter(TickerMapperPort, MarketDataProviderPort):
         self,
         ticker: Optional[str] = None,
         name: Optional[str] = None,
-        target_date: date = None,
+        target_date: Optional[date] = None,
     ) -> Optional[Dict[str, int]]:
         if target_date is None:
             return None

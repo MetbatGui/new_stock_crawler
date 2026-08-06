@@ -4,7 +4,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 class StoragePort(ABC):
@@ -15,7 +15,9 @@ class StoragePort(ABC):
     """
 
     @abstractmethod
-    def upload_file(self, local_path: Path, remote_filename: str = None) -> str:
+    def upload_file(
+        self, local_path: Path, remote_filename: Optional[str] = None
+    ) -> str:
         """
         파일 업로드
 
@@ -29,7 +31,7 @@ class StoragePort(ABC):
         pass
 
     @abstractmethod
-    def list_files(self, query: str = None) -> List[dict]:
+    def list_files(self, query: Optional[str] = None) -> List[dict]:
         """
         파일 목록 조회
 

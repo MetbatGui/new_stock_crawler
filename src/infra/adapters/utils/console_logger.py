@@ -2,6 +2,7 @@
 콘솔 로거 어댑터
 """
 
+import io
 import logging
 import sys
 
@@ -41,7 +42,7 @@ class ConsoleLogger(LoggerPort):
 
         # Windows CP949 환경 이모지 출력 대비 UTF-8 설정
         # pytest 캡처 환경에서는 reconfigure가 없거나 실패할 수 있으므로 안전하게 처리
-        if hasattr(sys.stdout, "reconfigure"):
+        if isinstance(sys.stdout, io.TextIOWrapper):
             try:
                 sys.stdout.reconfigure(encoding="utf-8")
             except Exception:

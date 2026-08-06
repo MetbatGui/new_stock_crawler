@@ -4,6 +4,7 @@ Google Drive 저장소 어댑터 구현
 
 import os
 from pathlib import Path
+from typing import Optional
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -23,9 +24,9 @@ class GoogleDriveAdapter(StoragePort):
 
     def __init__(
         self,
-        client_secret_file: str = None,
-        token_file: str = None,
-        folder_id: str = None,
+        client_secret_file: Optional[str] = None,
+        token_file: Optional[str] = None,
+        folder_id: Optional[str] = None,
     ):
         self.client_secret_file = client_secret_file or config.GOOGLE_CLIENT_SECRET_FILE
         self.token_file = token_file or config.GOOGLE_TOKEN_FILE
@@ -65,7 +66,9 @@ class GoogleDriveAdapter(StoragePort):
 
         self._service = build("drive", "v3", credentials=self._creds)
 
-    def upload_file(self, local_path: Path, remote_filename: str = None) -> str:
+    def upload_file(
+        self, local_path: Path, remote_filename: Optional[str] = None
+    ) -> str:
         """
         파일을 Google Drive 폴더로 업로드 (이미 존재하면 덮어쓰기)
 
@@ -77,6 +80,7 @@ class GoogleDriveAdapter(StoragePort):
             str: 업로드된 파일 ID
         """
         self._authenticate()
+        assert self._service is not None
 
         local_path = Path(local_path)
         if not local_path.exists():
@@ -125,7 +129,7 @@ class GoogleDriveAdapter(StoragePort):
             )
             return file.get("id")
 
-    def list_files(self, query: str = None) -> list:
+    def list_files(self, query: Optional[str] = None) -> list:
         """
         파일 목록 조회 (페이지네이션 지원)
 
@@ -136,6 +140,7 @@ class GoogleDriveAdapter(StoragePort):
             list: 파일 메타데이터 리스트 [{'id': ..., 'name': ..., 'createdTime': ...}]
         """
         self._authenticate()
+        assert self._service is not None
 
         q = "trashed = false"
         if self.folder_id:
@@ -177,6 +182,7 @@ class GoogleDriveAdapter(StoragePort):
             local_path: 저장할 로컬 경로
         """
         self._authenticate()
+        assert self._service is not None
 
         request = self._service.files().get_media(fileId=file_id)
 

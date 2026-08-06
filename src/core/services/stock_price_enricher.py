@@ -165,7 +165,7 @@ class StockPriceEnricher(StockEnricherPort):
             return result
 
     def _calculate_growth_rate(
-        self, close_price: int, confirmed_price: int
+        self, close_price: int, confirmed_price: Optional[int]
     ) -> Optional[float]:
         """수익률 계산"""
         if confirmed_price and confirmed_price > 0:

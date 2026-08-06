@@ -47,7 +47,7 @@ class DataFrameMapper(DataMapperPort):
     def to_dataframe(self, stocks: List[StockInfo]) -> pd.DataFrame:
         """StockInfo 리스트를 DataFrame으로 변환"""
         if not stocks:
-            return pd.DataFrame(columns=self.COLUMN_MAPPING.values())
+            return pd.DataFrame(columns=pd.Index(self.COLUMN_MAPPING.values()))
 
         # 객체를 딕셔너리로 변환
         data = [stock.__dict__ for stock in stocks]

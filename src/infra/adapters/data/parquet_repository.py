@@ -3,7 +3,7 @@ Parquet 기반 저장소 어댑터 구현
 """
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 import pandas as pd
 import os
 import logging
@@ -30,7 +30,7 @@ class ParquetRepository(RepositoryPort):
     # 중복 제거에 사용할 복합 PK
     _PK_COLS = ["종목명", "상장일"]
 
-    def __init__(self, base_dir: Path = None) -> None:
+    def __init__(self, base_dir: Optional[Path] = None) -> None:
         self._base_dir: Path = (base_dir or config.OUTPUT_DIR) / self.SUBDIR
         self._base_dir.mkdir(parents=True, exist_ok=True)
 

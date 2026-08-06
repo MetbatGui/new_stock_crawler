@@ -25,7 +25,7 @@ class MarketDataProviderPort(ABC):
         self,
         ticker: Optional[str] = None,
         name: Optional[str] = None,
-        target_date: date = None,
+        target_date: Optional[date] = None,
     ) -> Optional[Dict[str, int]]:
         """
         특정 날짜의 OHLC(시가, 고가, 저가, 종가) 데이터를 조회.
