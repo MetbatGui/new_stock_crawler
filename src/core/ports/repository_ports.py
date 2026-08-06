@@ -13,9 +13,9 @@ class RepositoryPort(ABC):
 
     책임:
         - 연도별 IPO 데이터의 영구 저장 및 조회
-        - upsert 시 (종목명, 상장일) 복합키 기준 중복 제거
+        - upsert 시 종목명 단일키 기준 중복 제거 (상장일은 정정될 수 있어 PK에서 제외)
 
-    구현체 예: ParquetRepository
+    구현체 예: SqliteRepository
     """
 
     @abstractmethod

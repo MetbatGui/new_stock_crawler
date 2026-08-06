@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     # Base Paths
     BASE_DIR: Path = Path(__file__).resolve().parent.parent
     OUTPUT_DIR: Path = BASE_DIR / "output"
+    DB_DIR: Path = BASE_DIR / "db"
 
     # Web Scraping
     BASE_URL: str = "http://www.38.co.kr"
