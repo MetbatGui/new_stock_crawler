@@ -1,9 +1,14 @@
 import unittest
 from datetime import date
+import pytest
 from infra.adapters.data.krx_native_adapter import KrxNativeAdapter, _resolve_name
 
 
+@pytest.mark.live
 class TestKrxNativeAdapter(unittest.TestCase):
+    """실제 KRX 서버에 접속하는 라이브 테스트 — 기본 pytest 실행에서 제외됨.
+    `uv run pytest -m live`로만 별도 실행 (KRX_USERNAME/PASSWORD .env 설정 필요)."""
+
     def setUp(self):
         self.adapter = KrxNativeAdapter()
 
