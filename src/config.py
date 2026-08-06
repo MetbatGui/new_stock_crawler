@@ -1,6 +1,7 @@
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     # Base Paths
     BASE_DIR: Path = Path(__file__).resolve().parent.parent
@@ -13,24 +14,23 @@ class Settings(BaseSettings):
 
     # Data Export
     EXCEL_FILENAME: str = "stock_data.xlsx"
-    
+
     # Google Drive Integration
     GOOGLE_CLIENT_SECRET_FILE: str = "secrets/client_secret.json"
     GOOGLE_TOKEN_FILE: str = "secrets/token.json"
     GOOGLE_DRIVE_FOLDER_ID: str = ""
-    
+
     # KRX Credentials
     KRX_USERNAME: str = ""
     KRX_PASSWORD: str = ""
-    
+
     # Logging
     LOG_LEVEL: str = "INFO"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
+
 
 # 전역 설정 객체
 config = Settings()

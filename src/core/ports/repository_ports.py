@@ -1,6 +1,7 @@
 """
 저장소 포트 인터페이스
 """
+
 from abc import ABC, abstractmethod
 from typing import Dict, List
 import pandas as pd

@@ -50,7 +50,9 @@ class EnrichmentService:
                 try:
                     stock_name = row.get("종목명") or row.get("name")
                     listing_date_val = row.get("상장일") or row.get("listing_date")
-                    confirmed_price_val = row.get("확정공모가") or row.get("confirmed_price")
+                    confirmed_price_val = row.get("확정공모가") or row.get(
+                        "confirmed_price"
+                    )
 
                     if not stock_name:
                         self.logger.info("    - [SKIP] 종목명 찾을 수 없음")

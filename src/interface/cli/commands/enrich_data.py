@@ -1,6 +1,7 @@
 """
 enrich-data 커맨드 — Parquet 저장소 기반 OHLC 보강
 """
+
 import typer
 from infra.adapters.data.parquet_repository import ParquetRepository
 from infra.adapters.data.krx_native_adapter import KrxNativeAdapter

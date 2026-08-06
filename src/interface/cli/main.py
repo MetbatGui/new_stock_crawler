@@ -1,6 +1,7 @@
 """
 Stock Crawler CLI - 단일 진입점
 """
+
 import typer
 from interface.cli.commands.full_crawl import full_crawl
 from interface.cli.commands.daily_update import daily_update

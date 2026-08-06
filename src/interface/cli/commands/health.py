@@ -1,6 +1,7 @@
 """
 healthcheck 커맨드 — 시스템 상태 점검
 """
+
 import typer
 from pathlib import Path
 from config import config
@@ -33,7 +34,9 @@ def health_check():
     logger.info("")
     logger.info("[1] 필수 파일 점검")
     env_file = Path(".env")
-    if not _check(".env", env_file.exists(), ".env 파일을 프로젝트 루트에 작성해 주세요."):
+    if not _check(
+        ".env", env_file.exists(), ".env 파일을 프로젝트 루트에 작성해 주세요."
+    ):
         all_ok = False
 
     # 2. Google 인증 파일
@@ -63,7 +66,9 @@ def health_check():
             True,
             "",
         )
-        logger.info(f"       => {len(files)}개 연도 파일: {[f.stem for f in sorted(files)]}")
+        logger.info(
+            f"       => {len(files)}개 연도 파일: {[f.stem for f in sorted(files)]}"
+        )
     else:
         _check(
             f"Parquet 저장소  ({parquet_dir})",
@@ -77,6 +82,7 @@ def health_check():
     if token_ok:
         try:
             from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
+
             storage = GoogleDriveAdapter()
             files = storage.list_files()
             _check("Google Drive 연결", True)

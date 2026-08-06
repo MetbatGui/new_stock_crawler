@@ -1,6 +1,7 @@
 """
 일일 업데이트 커맨드
 """
+
 import typer
 from datetime import date, datetime
 from typing import Optional
@@ -15,7 +16,9 @@ def daily_update(
         "-d",
         help="대상 날짜 (YYYY-MM-DD 형식), 기본값: 오늘",
     ),
-    headless: bool = typer.Option(config.HEADLESS, "--headless/--no-headless", help="헤드리스 모드"),
+    headless: bool = typer.Option(
+        config.HEADLESS, "--headless/--no-headless", help="헤드리스 모드"
+    ),
 ):
     """
     일일 업데이트 (GitHub Actions용)
@@ -31,7 +34,9 @@ def daily_update(
         try:
             parsed_date = datetime.strptime(target_date, "%Y-%m-%d").date()
         except ValueError:
-            typer.echo("❌ 날짜 형식이 잘못되었습니다. YYYY-MM-DD 형식으로 입력해주세요.")
+            typer.echo(
+                "❌ 날짜 형식이 잘못되었습니다. YYYY-MM-DD 형식으로 입력해주세요."
+            )
             raise typer.Exit(code=1)
     else:
         parsed_date = date.today()

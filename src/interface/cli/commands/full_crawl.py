@@ -1,6 +1,7 @@
 """
 전체 기간 크롤링 커맨드
 """
+
 import typer
 from datetime import date
 from config import config
@@ -9,7 +10,9 @@ from interface.cli.dependencies import build_dependencies
 
 def full_crawl(
     start_year: int = typer.Option(2020, "--start-year", "-s", help="크롤링 시작 연도"),
-    headless: bool = typer.Option(config.HEADLESS, "--headless/--no-headless", help="헤드리스 모드"),
+    headless: bool = typer.Option(
+        config.HEADLESS, "--headless/--no-headless", help="헤드리스 모드"
+    ),
 ):
     """
     전체 기간 크롤링 (초기 수집용)

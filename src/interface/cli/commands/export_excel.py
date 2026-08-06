@@ -1,6 +1,7 @@
 """
 export-excel 커맨드 — Parquet → Excel 렌더링
 """
+
 import typer
 from pathlib import Path
 from typing import Optional
@@ -24,9 +25,7 @@ def export_excel(
         "-o",
         help="저장할 디렉토리 또는 특정 파일 경로 (기본: output/)",
     ),
-    drive: bool = typer.Option(
-        False, "--drive", help="Google Drive로 업로드"
-    ),
+    drive: bool = typer.Option(False, "--drive", help="Google Drive로 업로드"),
 ):
     """
     Parquet 저장소에서 데이터를 읽어 연도별로 개별 Excel 파일로 렌더링
@@ -58,11 +57,11 @@ def export_excel(
     for y, df in sorted(raw_data.items()):
         if df.empty:
             continue
-            
+
         # 파일명 결정
         filename = f"신규상장종목({y}년).xlsx"
         output_path = base_output_dir / filename
-        
+
         # 만약 output이 파일 경로로 들어왔고 단일 연도 조회인 경우 그 경로를 존중
         if output and not output.is_dir() and year is not None:
             output_path = output
@@ -74,10 +73,15 @@ def export_excel(
         # Google Drive 업로드
         if drive:
             try:
-                from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
+                from infra.adapters.storage.google_drive_adapter import (
+                    GoogleDriveAdapter,
+                )
+
                 storage = GoogleDriveAdapter()
                 file_id = storage.upload_file(output_path)
-                logger.info(f"   ☁️  Google Drive 업로드 완료: {output_path.name} (ID: {file_id})")
+                logger.info(
+                    f"   ☁️  Google Drive 업로드 완료: {output_path.name} (ID: {file_id})"
+                )
             except Exception as e:
                 logger.error(f"   ⚠️  [{y}년] Google Drive 업로드 실패: {e}")
 

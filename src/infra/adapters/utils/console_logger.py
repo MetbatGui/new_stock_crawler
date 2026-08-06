@@ -1,6 +1,7 @@
 """
 콘솔 로거 어댑터
 """
+
 import logging
 import sys
 
@@ -11,6 +12,7 @@ def _get_log_level() -> int:
     """config 순환 임포트 방지를 위해 지연 로드로 LOG_LEVEL 반환"""
     try:
         from config import config  # noqa: PLC0415
+
         return getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
     except Exception:
         return logging.INFO

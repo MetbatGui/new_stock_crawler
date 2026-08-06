@@ -1,12 +1,17 @@
 """
 주가 정보 보강 서비스
 """
+
 from typing import Optional, Dict
 from dataclasses import replace
 import pandas as pd
 
 from core.domain.models import StockInfo
-from core.ports.enrichment_ports import TickerMapperPort, MarketDataProviderPort, StockEnricherPort
+from core.ports.enrichment_ports import (
+    TickerMapperPort,
+    MarketDataProviderPort,
+    StockEnricherPort,
+)
 from core.ports.utility_ports import LoggerPort
 
 
@@ -19,7 +24,7 @@ class StockPriceEnricher(StockEnricherPort):
         self,
         ticker_mapper: TickerMapperPort,
         market_data_provider: MarketDataProviderPort,
-        logger: LoggerPort
+        logger: LoggerPort,
     ):
         self.ticker_mapper = ticker_mapper
         self.market_data_provider = market_data_provider
@@ -39,48 +44,66 @@ class StockPriceEnricher(StockEnricherPort):
                 listing_date_str = str(stock.listing_date).replace(".", "-")
                 listing_date = pd.to_datetime(listing_date_str).date()
             except Exception as e:
-                self.logger.info(f"      ⚠️  날짜 변환 실패: {stock.name} ({stock.listing_date}) - {e}")
+                self.logger.info(
+                    f"      ⚠️  날짜 변환 실패: {stock.name} ({stock.listing_date}) - {e}"
+                )
                 return stock
 
             # 2. OHLC 조회 (이름으로 직접 조회)
-            ohlc = self.market_data_provider.get_ohlc(name=stock.name, target_date=listing_date)
-            
-            if not ohlc:
-                 # 티커로 한번 더 시도 (fallback)
-                ticker = self.ticker_mapper.get_ticker(stock.name)
-                if ticker:
-                    ohlc = self.market_data_provider.get_ohlc(ticker=ticker, target_date=listing_date)
+            ohlc = self.market_data_provider.get_ohlc(
+                name=stock.name, target_date=listing_date
+            )
 
             if not ohlc:
-                self.logger.info(f"      ⚠️  OHLC 데이터 없음: {stock.name} ({listing_date})")
+                # 티커로 한번 더 시도 (fallback)
+                ticker = self.ticker_mapper.get_ticker(stock.name)
+                if ticker:
+                    ohlc = self.market_data_provider.get_ohlc(
+                        ticker=ticker, target_date=listing_date
+                    )
+
+            if not ohlc:
+                self.logger.info(
+                    f"      ⚠️  OHLC 데이터 없음: {stock.name} ({listing_date})"
+                )
                 return stock
 
             # 3. 수익률 계산
-            growth_rate = self._calculate_growth_rate(ohlc['Close'], stock.confirmed_price)
+            growth_rate = self._calculate_growth_rate(
+                ohlc["Close"], stock.confirmed_price
+            )
 
             # 4. 새로운 StockInfo 객체 생성
             enriched_stock = replace(
                 stock,
-                open_price=ohlc['Open'],
-                high_price=ohlc['High'],
-                low_price=ohlc['Low'],
-                close_price=ohlc['Close'],
-                growth_rate=growth_rate
+                open_price=ohlc["Open"],
+                high_price=ohlc["High"],
+                low_price=ohlc["Low"],
+                close_price=ohlc["Close"],
+                growth_rate=growth_rate,
             )
 
-            self.logger.info(f"      💹 OHLC 추가: {stock.name} (수익률 {growth_rate}%)")
+            self.logger.info(
+                f"      💹 OHLC 추가: {stock.name} (수익률 {growth_rate}%)"
+            )
             return enriched_stock
 
         except Exception as e:
             self.logger.warning(f"      ⚠️  OHLC 조회 실패: {stock.name} - {e}")
             return stock
 
-    def get_market_data(self, stock_name: str, listing_date_val: str, confirmed_price_val: str) -> Dict:
+    def get_market_data(
+        self, stock_name: str, listing_date_val: str, confirmed_price_val: str
+    ) -> Dict:
         """
         종목명, 상장일, 공모가를 받아 OHLC 및 수익률 딕셔너리 반환 (EnrichmentService용)
         """
         result = {
-            '시가': None, '고가': None, '저가': None, '종가': None, '수익률(%)': None
+            "시가": None,
+            "고가": None,
+            "저가": None,
+            "종가": None,
+            "수익률(%)": None,
         }
 
         try:
@@ -93,35 +116,47 @@ class StockPriceEnricher(StockEnricherPort):
                 listing_date_str = str(listing_date_val).replace(".", "-")
                 listing_date = pd.to_datetime(listing_date_str).date()
             except Exception as e:
-                self.logger.info(f"    - [SKIP] 날짜 변환 실패: {stock_name} ({listing_date_val}) - {e}")
+                self.logger.info(
+                    f"    - [SKIP] 날짜 변환 실패: {stock_name} ({listing_date_val}) - {e}"
+                )
                 return result
 
             # 2. OHLC 조회 (이름으로 직접 조회)
-            ohlc = self.market_data_provider.get_ohlc(name=stock_name, target_date=listing_date)
-            
+            ohlc = self.market_data_provider.get_ohlc(
+                name=stock_name, target_date=listing_date
+            )
+
             if not ohlc:
                 # Fallback: Ticker로 시도
                 ticker = self.ticker_mapper.get_ticker(stock_name)
                 if ticker:
-                    ohlc = self.market_data_provider.get_ohlc(ticker=ticker, target_date=listing_date)
+                    ohlc = self.market_data_provider.get_ohlc(
+                        ticker=ticker, target_date=listing_date
+                    )
 
             if not ohlc:
-                self.logger.info(f"    - [SKIP] OHLC 데이터 없음: {stock_name} ({listing_date})")
+                self.logger.info(
+                    f"    - [SKIP] OHLC 데이터 없음: {stock_name} ({listing_date})"
+                )
                 return result
 
-            result['시가'] = ohlc['Open']
-            result['고가'] = ohlc['High']
-            result['저가'] = ohlc['Low']
-            result['종가'] = ohlc['Close']
+            result["시가"] = ohlc["Open"]
+            result["고가"] = ohlc["High"]
+            result["저가"] = ohlc["Low"]
+            result["종가"] = ohlc["Close"]
 
             # 3. 수익률 계산
             confirmed_price = self._parse_price(confirmed_price_val)
             if confirmed_price:
-                growth_rate = self._calculate_growth_rate(ohlc['Close'], confirmed_price)
-                result['수익률(%)'] = growth_rate
+                growth_rate = self._calculate_growth_rate(
+                    ohlc["Close"], confirmed_price
+                )
+                result["수익률(%)"] = growth_rate
                 self.logger.info(f"    - [OK] {stock_name}: 수익률 {growth_rate}%")
             else:
-                 self.logger.info(f"    - [WARN] 공모가 변환 실패: {stock_name} ({confirmed_price_val})")
+                self.logger.info(
+                    f"    - [WARN] 공모가 변환 실패: {stock_name} ({confirmed_price_val})"
+                )
 
             return result
 
@@ -129,7 +164,9 @@ class StockPriceEnricher(StockEnricherPort):
             self.logger.error(f"    - [ERROR] {stock_name} 처리 중 오류: {e}")
             return result
 
-    def _calculate_growth_rate(self, close_price: int, confirmed_price: int) -> Optional[float]:
+    def _calculate_growth_rate(
+        self, close_price: int, confirmed_price: int
+    ) -> Optional[float]:
         """수익률 계산"""
         if confirmed_price and confirmed_price > 0:
             growth_rate = (close_price - confirmed_price) / confirmed_price * 100

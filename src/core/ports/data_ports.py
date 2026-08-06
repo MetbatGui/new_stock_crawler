@@ -1,6 +1,7 @@
 """
 데이터 처리 관련 포트 인터페이스
 """
+
 from abc import ABC, abstractmethod
 from typing import List
 import pandas as pd

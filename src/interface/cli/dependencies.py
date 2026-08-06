@@ -1,6 +1,7 @@
 """
 CLI 의존성 주입 모듈
 """
+
 from typing import Any, Dict
 
 from core.services.crawler_service import CrawlerService

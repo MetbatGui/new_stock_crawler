@@ -1,6 +1,7 @@
 """
 Parquet 기반 저장소 어댑터 구현
 """
+
 from pathlib import Path
 from typing import Dict, List
 import pandas as pd
