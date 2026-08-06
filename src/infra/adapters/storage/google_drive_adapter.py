@@ -67,7 +67,10 @@ class GoogleDriveAdapter(StoragePort):
         self._service = build("drive", "v3", credentials=self._creds)
 
     def upload_file(
-        self, local_path: Path, remote_filename: Optional[str] = None
+        self,
+        local_path: Path,
+        remote_filename: Optional[str] = None,
+        parent_folder_id: Optional[str] = None,
     ) -> str:
         """
         파일을 Google Drive 폴더로 업로드 (이미 존재하면 덮어쓰기)
@@ -75,6 +78,7 @@ class GoogleDriveAdapter(StoragePort):
         Args:
             local_path: 로컬 파일 경로
             remote_filename: 저장할 파일명 (기본값: 로컬 파일명)
+            parent_folder_id: 업로드할 상위 폴더 ID (기본값: self.folder_id 루트)
 
         Returns:
             str: 업로드된 파일 ID
@@ -87,9 +91,12 @@ class GoogleDriveAdapter(StoragePort):
             raise FileNotFoundError(f"업로드할 파일을 찾을 수 없습니다: {local_path}")
 
         file_name = remote_filename or local_path.name
+        target_folder_id = parent_folder_id or self.folder_id
 
-        # 1. 기존 파일 검색
-        existing_files = self.list_files(f"name = '{file_name}'")
+        # 1. 기존 파일 검색 (같은 폴더 내에서)
+        existing_files = self.list_files(
+            f"name = '{file_name}'", folder_id=target_folder_id
+        )
 
         media = MediaFileUpload(str(local_path), resumable=True)
 
@@ -115,7 +122,7 @@ class GoogleDriveAdapter(StoragePort):
 
             file_metadata = {
                 "name": file_name,
-                "parents": [self.folder_id] if self.folder_id else [],
+                "parents": [target_folder_id] if target_folder_id else [],
             }
 
             file = (
@@ -129,12 +136,41 @@ class GoogleDriveAdapter(StoragePort):
             )
             return file.get("id")
 
-    def list_files(self, query: Optional[str] = None) -> list:
+    def _get_or_create_subfolder(self, name: str) -> str:
+        """`self.folder_id` 하위에서 이름이 `name`인 폴더를 찾고, 없으면 생성해 ID를 반환"""
+        self._authenticate()
+        assert self._service is not None
+
+        q = (
+            f"name = '{name}' and mimeType = 'application/vnd.google-apps.folder' "
+            "and trashed = false"
+        )
+        if self.folder_id:
+            q += f" and '{self.folder_id}' in parents"
+
+        results = self._service.files().list(q=q, fields="files(id, name)").execute()
+        found = results.get("files", [])
+        if found:
+            return found[0]["id"]
+
+        metadata = {
+            "name": name,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [self.folder_id] if self.folder_id else [],
+        }
+        folder = self._service.files().create(body=metadata, fields="id").execute()
+        print(f"      [Google Drive] 서브폴더 생성: {name} (ID: {folder['id']})")
+        return folder["id"]
+
+    def list_files(
+        self, query: Optional[str] = None, folder_id: Optional[str] = None
+    ) -> list:
         """
         파일 목록 조회 (페이지네이션 지원)
 
         Args:
             query: 검색 쿼리 (예: "name contains '신규상장종목'")
+            folder_id: 조회할 상위 폴더 ID (기본값: self.folder_id 루트)
 
         Returns:
             list: 파일 메타데이터 리스트 [{'id': ..., 'name': ..., 'createdTime': ...}]
@@ -142,9 +178,11 @@ class GoogleDriveAdapter(StoragePort):
         self._authenticate()
         assert self._service is not None
 
+        target_folder_id = folder_id or self.folder_id
+
         q = "trashed = false"
-        if self.folder_id:
-            q += f" and '{self.folder_id}' in parents"
+        if target_folder_id:
+            q += f" and '{target_folder_id}' in parents"
         if query:
             q += f" and ({query})"
 

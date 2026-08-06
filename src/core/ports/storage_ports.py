@@ -16,7 +16,10 @@ class StoragePort(ABC):
 
     @abstractmethod
     def upload_file(
-        self, local_path: Path, remote_filename: Optional[str] = None
+        self,
+        local_path: Path,
+        remote_filename: Optional[str] = None,
+        parent_folder_id: Optional[str] = None,
     ) -> str:
         """
         파일 업로드
@@ -24,6 +27,7 @@ class StoragePort(ABC):
         Args:
             local_path: 로컬 파일 경로
             remote_filename: 원격 저장소에 저장할 파일명 (None이면 로컬 파일명 사용)
+            parent_folder_id: 업로드할 상위 폴더 ID (None이면 기본 루트 폴더)
 
         Returns:
             str: 업로드된 파일의 ID 또는 URL
