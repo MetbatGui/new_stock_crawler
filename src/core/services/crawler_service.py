@@ -2,8 +2,8 @@
 크롤링 비즈니스 로직 서비스
 """
 
-from datetime import date, datetime, timedelta
-from typing import Callable, Dict
+from datetime import date, timedelta
+from typing import Dict
 import pandas as pd
 
 from core.ports.web_scraping_ports import (
@@ -14,7 +14,6 @@ from core.ports.web_scraping_ports import (
 from core.ports.data_ports import DataMapperPort
 from core.ports.repository_ports import RepositoryPort
 from core.ports.utility_ports import DateRangeCalculatorPort, LoggerPort
-from core.services.stock_price_enricher import StockPriceEnricher
 
 
 class CrawlerService:
@@ -35,9 +34,7 @@ class CrawlerService:
         data_mapper: DataMapperPort,
         repository: RepositoryPort,
         date_calculator: DateRangeCalculatorPort,
-        stock_enricher: StockPriceEnricher,
         logger: LoggerPort,
-        clock: Callable[[], datetime] = datetime.now,
     ):
         # 모든 의존성을 생성자에서 받음 (명시적)
         self.page_provider = page_provider
@@ -46,10 +43,7 @@ class CrawlerService:
         self.data_mapper = data_mapper
         self.repository = repository
         self.date_calculator = date_calculator
-        self.stock_enricher = stock_enricher
         self.logger = logger
-        # clock: Callable[[], datetime] 주입으로 시간 의존 로직 테스트 가능
-        self.clock = clock
 
     def run(self, start_year: int) -> Dict[int, pd.DataFrame]:
         """
@@ -96,19 +90,14 @@ class CrawlerService:
                 page=page, stocks=report.results
             )
 
-            # 3-2-1. 데이터 보강 (OHLC)
-            enriched_details = [
-                self.stock_enricher.enrich_stock_info(stock) for stock in stock_details
-            ]
-
-            # 3-3. DataFrame 변환
-            df = self.data_mapper.to_dataframe(enriched_details)
+            # 3-3. DataFrame 변환 (OHLC 보강은 EnrichmentService가 별도 백필 단계에서 수행)
+            df = self.data_mapper.to_dataframe(stock_details)
 
             if not df.empty:
                 yearly_data[year] = df
                 self.logger.info(f"[{year}년] {len(df)}건 수집 완료")
 
-        # 4. 데이터 저장 (Parquet upsert)
+        # 4. 데이터 저장 (SQLite upsert)
         if yearly_data:
             for year, df in yearly_data.items():
                 self.repository.save(year, df)
@@ -175,42 +164,8 @@ class CrawlerService:
                 page=page, stocks=report.results
             )
 
-            # 데이터 보강 (조건부 OHLC)
-            enriched_details = []
-            now = self.clock()
-            today = now.date()
-
-            for stock in stock_details:
-                # OHLC 수집 조건 판단
-                should_enrich = False
-
-                # 1. 과거 날짜: 무조건 수집
-                if target_date < today:
-                    should_enrich = True
-                # 2. 오늘: 15:30 이후에만 수집
-                elif target_date == today:
-                    # 15시 30분 이후인지 확인
-                    if now.hour > 15 or (now.hour == 15 and now.minute >= 30):
-                        should_enrich = True
-                    else:
-                        self.logger.info(
-                            f"      ⏳ 장 마감 전(15:30 이전)이므로 OHLC 수집 생략: {stock.name}"
-                        )
-                # 3. 미래: 수집 안 함 (기본값 False)
-                else:
-                    self.logger.info(
-                        f"      📅 미래 상장 예정이므로 OHLC 수집 생략: {stock.name}"
-                    )
-
-                if should_enrich:
-                    enriched_details.append(
-                        self.stock_enricher.enrich_stock_info(stock)
-                    )
-                else:
-                    enriched_details.append(stock)
-
-            # DataFrame 변환
-            df = self.data_mapper.to_dataframe(enriched_details)
+            # DataFrame 변환 (OHLC 보강은 EnrichmentService가 별도 백필 단계에서 수행)
+            df = self.data_mapper.to_dataframe(stock_details)
 
             if not df.empty:
                 year_frames[year].append(df)
@@ -218,7 +173,7 @@ class CrawlerService:
                 total_collected += len(df)
                 self.logger.info(f"[{target_date}] {len(df)}건 처리 완료")
 
-        # 데이터 병합 및 저장 (Parquet upsert)
+        # 데이터 병합 및 저장 (SQLite upsert)
         yearly_data: Dict[int, pd.DataFrame] = {}
         if year_frames:
             for year, dfs in year_frames.items():
