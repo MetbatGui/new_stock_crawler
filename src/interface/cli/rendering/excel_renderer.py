@@ -57,6 +57,9 @@ class ExcelRenderer:
         with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
             for year, df in sorted_data.items():
                 sheet_name = f"{year}년"
+                # '티커' 컬럼이 있으면 제거 (사용자 요청)
+                if "티커" in df.columns:
+                    df = df.drop(columns=["티커"])
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
                 self._adjust_column_width(writer, sheet_name, df)
 

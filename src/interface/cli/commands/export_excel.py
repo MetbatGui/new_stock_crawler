@@ -22,63 +22,63 @@ def export_excel(
         None,
         "--output",
         "-o",
-        help="저장할 Excel 경로 (기본: output/신규상장종목.xlsx)",
+        help="저장할 디렉토리 또는 특정 파일 경로 (기본: output/)",
     ),
     drive: bool = typer.Option(
         False, "--drive", help="Google Drive로 업로드"
     ),
 ):
     """
-    Parquet 저장소에서 데이터를 읽어 Excel 파일로 렌더링
-
-    저장소(Parquet)와 표현(Excel)을 분리한 구조에서
-    이 커맨드가 유일하게 Excel 파일을 생성합니다.
+    Parquet 저장소에서 데이터를 읽어 연도별로 개별 Excel 파일로 렌더링
     """
     logger = ConsoleLogger()
     repository = ParquetRepository()
     renderer = ExcelRenderer()
 
     logger.info("=" * 60)
-    logger.info("📊 Excel 렌더링 시작")
+    logger.info("📊 연도별 Excel 분할 렌더링 시작")
 
     # 데이터 로드
     if year is not None:
-        data = {year: repository.load(year)}
-        if data[year].empty:
+        raw_data = {year: repository.load(year)}
+        if raw_data[year].empty:
             logger.warning(f"[{year}년] 저장된 데이터가 없습니다.")
             raise typer.Exit(code=1)
-        logger.info(f"[{year}년] {len(data[year])}건 로드")
     else:
-        data = repository.load_all()
-        if not data:
+        raw_data = repository.load_all()
+        if not raw_data:
             logger.warning("저장된 데이터가 없습니다. 먼저 크롤링을 실행해 주세요.")
             raise typer.Exit(code=1)
-        total = sum(len(df) for df in data.values())
-        logger.info(f"전체 {len(data)}개 연도, {total}건 로드")
 
-    # 출력 경로 결정
-    if output:
-        output_path = Path(output)
-    else:
-        output_path = config.OUTPUT_DIR / "신규상장종목.xlsx"
-    
-    # 출력 디렉토리 생성 보장
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    # 출력 기본 디렉토리
+    base_output_dir = output if output and output.is_dir() else config.OUTPUT_DIR
+    base_output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 렌더링
-    renderer.render(data, output_path)
-    logger.info(f"✅ Excel 저장 완료: {output_path}")
+    # 연도별로 루프를 돌며 개별 파일 생성 및 업로드
+    for y, df in sorted(raw_data.items()):
+        if df.empty:
+            continue
+            
+        # 파일명 결정
+        filename = f"신규상장종목({y}년).xlsx"
+        output_path = base_output_dir / filename
+        
+        # 만약 output이 파일 경로로 들어왔고 단일 연도 조회인 경우 그 경로를 존중
+        if output and not output.is_dir() and year is not None:
+            output_path = output
 
-    # Google Drive 업로드
-    if drive:
-        try:
-            from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
-            storage = GoogleDriveAdapter()
-            file_id = storage.upload_file(output_path)
-            logger.info(f"☁️  Google Drive 업로드 완료 (ID: {file_id})")
-        except Exception as e:
-            logger.error(f"⚠️  Google Drive 업로드 실패: {e}")
-            logger.info("=" * 60)
-            raise typer.Exit(code=1)
+        # 렌더링 (단일 연도 데이터를 딕셔너리로 감싸서 전달)
+        renderer.render({y: df}, output_path)
+        logger.info(f"✅ [{y}년] Excel 저장 완료: {output_path.name}")
+
+        # Google Drive 업로드
+        if drive:
+            try:
+                from infra.adapters.storage.google_drive_adapter import GoogleDriveAdapter
+                storage = GoogleDriveAdapter()
+                file_id = storage.upload_file(output_path)
+                logger.info(f"   ☁️  Google Drive 업로드 완료: {output_path.name} (ID: {file_id})")
+            except Exception as e:
+                logger.error(f"   ⚠️  [{y}년] Google Drive 업로드 실패: {e}")
 
     logger.info("=" * 60)
