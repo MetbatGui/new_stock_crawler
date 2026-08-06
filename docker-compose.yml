@@ -4,6 +4,7 @@ services:
     image: new-stock-crawler:latest
     volumes:
       - ./output:/app/output
+      - ./db:/app/db
       - ./secrets:/app/secrets
       - ./.env:/app/.env
     environment:
