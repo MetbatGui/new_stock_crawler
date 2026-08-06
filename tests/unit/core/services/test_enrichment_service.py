@@ -3,6 +3,7 @@ EnrichmentService 단위 테스트
 
 StockEnricherPort를 mock으로 주입하여 EnrichmentService 비즈니스 로직만 검증.
 """
+
 import pytest
 import pandas as pd
 from unittest.mock import Mock
@@ -40,16 +41,17 @@ def service(mock_enricher, mock_repository, mock_logger) -> EnrichmentService:
 @pytest.fixture
 def sample_yearly_data() -> dict:
     return {
-        2024: pd.DataFrame({
-            "종목명": ["주식A", "주식B"],
-            "상장일": ["2024-01-15", "2024-02-20"],
-            "확정공모가": [10000, 20000],
-        })
+        2024: pd.DataFrame(
+            {
+                "종목명": ["주식A", "주식B"],
+                "상장일": ["2024-01-15", "2024-02-20"],
+                "확정공모가": [10000, 20000],
+            }
+        )
     }
 
 
 class TestEnrichmentService:
-
     def test_enricher_port_injected_not_concrete(self, mock_enricher):
         """EnrichmentService 생성자가 포트 인터페이스를 받아야 한다"""
         svc = EnrichmentService(
@@ -64,7 +66,11 @@ class TestEnrichmentService:
     ):
         """연도별로 repository.save()가 1회씩 호출되어야 한다"""
         mock_enricher.get_market_data.return_value = {
-            "시가": None, "고가": None, "저가": None, "종가": None, "수익률(%)": None
+            "시가": None,
+            "고가": None,
+            "저가": None,
+            "종가": None,
+            "수익률(%)": None,
         }
 
         service.enrich_data(sample_yearly_data)
@@ -87,15 +93,21 @@ class TestEnrichmentService:
     ):
         """get_market_data가 데이터를 반환하면 DataFrame에 반영되어야 한다"""
         mock_enricher.get_market_data.return_value = {
-            "시가": 10000, "고가": 11000, "저가": 9500, "종가": 10500, "수익률(%)": 5.0
+            "시가": 10000,
+            "고가": 11000,
+            "저가": 9500,
+            "종가": 10500,
+            "수익률(%)": 5.0,
         }
 
         yearly_data = {
-            2024: pd.DataFrame({
-                "종목명": ["주식A"],
-                "상장일": ["2024-01-15"],
-                "확정공모가": [10000],
-            })
+            2024: pd.DataFrame(
+                {
+                    "종목명": ["주식A"],
+                    "상장일": ["2024-01-15"],
+                    "확정공모가": [10000],
+                }
+            )
         }
 
         service.enrich_data(yearly_data)
@@ -123,17 +135,86 @@ class TestEnrichmentService:
     ):
         """종목명이 없는 행은 get_market_data를 호출하지 않고 건너뛰어야 한다"""
         yearly_data = {
-            2024: pd.DataFrame({
-                "종목명": [None, "주식A"],
-                "상장일": ["2024-01-15", "2024-02-20"],
-                "확정공모가": [None, 10000],
-            })
+            2024: pd.DataFrame(
+                {
+                    "종목명": [None, "주식A"],
+                    "상장일": ["2024-01-15", "2024-02-20"],
+                    "확정공모가": [None, 10000],
+                }
+            )
         }
         mock_enricher.get_market_data.return_value = {
-            "시가": None, "고가": None, "저가": None, "종가": None, "수익률(%)": None
+            "시가": None,
+            "고가": None,
+            "저가": None,
+            "종가": None,
+            "수익률(%)": None,
         }
 
         service.enrich_data(yearly_data)
 
         # 종목명 없는 행 skip → 1번만 호출 (주식A 1건)
         assert mock_enricher.get_market_data.call_count == 1
+
+    def test_nan_stock_name_skips_silently(
+        self, service, mock_enricher, mock_repository
+    ):
+        """종목명이 NaN(float)인 행도 skip 되어야 한다 (pandas 결측치는 bool(nan)이 True라
+        기존 `if not stock_name` 조건만으로는 걸러지지 않던 버그)"""
+        yearly_data = {
+            2024: pd.DataFrame(
+                {
+                    "종목명": [float("nan"), "주식A"],
+                    "상장일": ["2024-01-15", "2024-02-20"],
+                    "확정공모가": [None, 10000],
+                }
+            )
+        }
+        mock_enricher.get_market_data.return_value = {
+            "시가": None,
+            "고가": None,
+            "저가": None,
+            "종가": None,
+            "수익률(%)": None,
+        }
+
+        service.enrich_data(yearly_data)
+
+        assert mock_enricher.get_market_data.call_count == 1
+
+    def test_enrich_data_skips_row_already_enriched(
+        self, service, mock_enricher, mock_repository
+    ):
+        """종가가 이미 채워진 행은 get_market_data를 다시 호출하지 않아야 한다 (idempotent)"""
+        yearly_data = {
+            2024: pd.DataFrame(
+                {
+                    "종목명": ["주식A"],
+                    "상장일": ["2024-01-15"],
+                    "확정공모가": [10000],
+                    "종가": [10500],
+                }
+            )
+        }
+
+        service.enrich_data(yearly_data)
+
+        mock_enricher.get_market_data.assert_not_called()
+
+    def test_enrich_data_skips_row_before_cutoff(
+        self, service, mock_enricher, mock_repository
+    ):
+        """상장일 15:50 컷오프가 아직 지나지 않은(미래) 행은 get_market_data를 호출하지 않아야 한다"""
+        yearly_data = {
+            2099: pd.DataFrame(
+                {
+                    "종목명": ["미래종목"],
+                    "상장일": ["2099-01-01"],
+                    "확정공모가": [10000],
+                }
+            )
+        }
+
+        service.enrich_data(yearly_data)
+
+        mock_enricher.get_market_data.assert_not_called()

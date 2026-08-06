@@ -1,15 +1,20 @@
+from datetime import datetime, time
 from typing import Dict
 import pandas as pd
 from core.ports.enrichment_ports import StockEnricherPort
 from core.ports.utility_ports import LoggerPort
 from core.ports.repository_ports import RepositoryPort
 
+# 상장일 장마감(15:30) 후 KRX 시세 확정을 기다리는 버퍼
+ENRICH_CUTOFF_TIME = time(15, 50)
+
 
 class EnrichmentService:
     """
     수집된 데이터에 추가 정보(시세, 성장률)를 보강하는 서비스
 
-    보강 결과는 RepositoryPort(Parquet)에 upsert됩니다.
+    보강 결과는 RepositoryPort(SQLite)에 upsert됩니다.
+    이미 채워진 행과 아직 상장일 컷오프 전인 행은 건너뛰므로 재실행이 안전(idempotent)합니다.
     """
 
     def __init__(
@@ -54,9 +59,15 @@ class EnrichmentService:
                         "confirmed_price"
                     )
 
-                    if not stock_name:
+                    if pd.isna(stock_name) or not stock_name:
                         self.logger.info("    - [SKIP] 종목명 찾을 수 없음")
                         continue
+
+                    if pd.notna(row.get("종가")):
+                        continue  # 이미 보강된 행 — 재조회하지 않음
+
+                    if not self._is_past_cutoff(listing_date_val):
+                        continue  # 상장일 15:50 컷오프 전 — 아직 시세 미확정
 
                     market_data = self.stock_enricher.get_market_data(
                         stock_name, listing_date_val, confirmed_price_val
@@ -77,8 +88,19 @@ class EnrichmentService:
                         f"    - [ERROR] {row.get('종목명', 'Unknown')} 처리 중 오류: {e}"
                     )
 
-            # Parquet upsert (보강된 연도 데이터만 저장)
+            # SQLite upsert (보강된 연도 데이터만 저장)
             self.repository.save(year, df)
 
         self.logger.info(f"✅ 데이터 보강 완료 (총 {total_enriched}건 시세 추가됨)")
         self.logger.info("=" * 60)
+
+    def _is_past_cutoff(self, listing_date_val) -> bool:
+        """상장일 15:50 컷오프가 지났는지 확인 (장마감 후 시세 확정 대기 버퍼)"""
+        if not listing_date_val or listing_date_val == "N/A":
+            return False
+        try:
+            listing_date_str = str(listing_date_val).replace(".", "-")
+            listing_date = pd.to_datetime(listing_date_str).date()
+        except Exception:
+            return False
+        return datetime.combine(listing_date, ENRICH_CUTOFF_TIME) <= datetime.now()
