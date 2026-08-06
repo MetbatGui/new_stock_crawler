@@ -12,7 +12,7 @@ from infra.adapters.web.playwright_page_provider import PlaywrightPageProvider
 from infra.adapters.web.calendar_scraper_adapter import CalendarScraperAdapter
 from infra.adapters.web.detail_scraper_adapter import DetailScraperAdapter
 from infra.adapters.data.dataframe_mapper import DataFrameMapper
-from infra.adapters.data.parquet_repository import ParquetRepository
+from infra.adapters.data.sqlite_repository import SqliteRepository
 from infra.adapters.data.krx_native_adapter import KrxNativeAdapter
 
 
@@ -34,8 +34,8 @@ def build_dependencies(headless: bool = True) -> Dict[str, Any]:
     krx_adapter = KrxNativeAdapter()
     data_mapper = DataFrameMapper()
 
-    # 3. 저장소 (Parquet)
-    repository = ParquetRepository()
+    # 3. 저장소 (SQLite)
+    repository = SqliteRepository()
 
     # 4. OHLC 보강
     stock_enricher = StockPriceEnricher(

@@ -1,5 +1,5 @@
 """
-export-excel 커맨드 — Parquet → Excel 렌더링
+export-excel 커맨드 — SQLite → Excel 렌더링
 """
 
 import typer
@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from config import config
-from infra.adapters.data.parquet_repository import ParquetRepository
+from infra.adapters.data.sqlite_repository import SqliteRepository
 from interface.cli.rendering.excel_renderer import ExcelRenderer
 from infra.adapters.utils.console_logger import ConsoleLogger
 
@@ -28,10 +28,10 @@ def export_excel(
     drive: bool = typer.Option(False, "--drive", help="Google Drive로 업로드"),
 ):
     """
-    Parquet 저장소에서 데이터를 읽어 연도별로 개별 Excel 파일로 렌더링
+    SQLite 저장소에서 데이터를 읽어 연도별로 개별 Excel 파일로 렌더링
     """
     logger = ConsoleLogger()
-    repository = ParquetRepository()
+    repository = SqliteRepository()
     renderer = ExcelRenderer()
 
     logger.info("=" * 60)
