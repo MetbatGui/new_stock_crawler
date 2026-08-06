@@ -8,6 +8,15 @@ from core.ports.enrichment_ports import TickerMapperPort, MarketDataProviderPort
 logger = logging.getLogger("crawler")
 
 
+def _resolve_name(table: Dict[str, Any], stock_name: str) -> Optional[Any]:
+    """이름 테이블(dict)에서 종목명을 조회. 정확히 일치하지 않으면
+    "(주)" 제거 및 공백 정리 후 재시도 (순수 함수 — 네트워크 없이 단위테스트 가능)."""
+    if stock_name in table:
+        return table[stock_name]
+    cleaned = stock_name.replace("(주)", "").strip()
+    return table.get(cleaned)
+
+
 class KrxNativeAdapter(TickerMapperPort, MarketDataProviderPort):
     """
     KRX 정보데이터시스템(data.krx.co.kr)에서 직접 데이터를 스크래핑하는 어댑터.
@@ -144,10 +153,7 @@ class KrxNativeAdapter(TickerMapperPort, MarketDataProviderPort):
             if t_map:
                 break
 
-        if stock_name in t_map:
-            return t_map[stock_name]
-        cln = stock_name.replace("(주)", "").strip()
-        return t_map.get(cln)
+        return _resolve_name(t_map, stock_name)
 
     def get_ohlc(
         self,
@@ -170,11 +176,7 @@ class KrxNativeAdapter(TickerMapperPort, MarketDataProviderPort):
         # 2. 이름으로 조회 시도
         if not row and name:
             name_map = self._market_data_cache.get(f"{d_str}_by_name", {})
-            row = name_map.get(name)
-            # (주) 제거 후 재검색
-            if not row and "(주)" in name:
-                cln = name.replace("(주)", "").strip()
-                row = name_map.get(cln)
+            row = _resolve_name(name_map, name)
 
         if not row:
             return None
