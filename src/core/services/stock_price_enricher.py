@@ -27,16 +27,10 @@ class StockPriceEnricher(StockEnricherPort):
 
     def enrich_stock_info(self, stock: StockInfo) -> StockInfo:
         """
-        StockInfo 객체에 OHLC 및 수익률 정보를 보강하여 반환
+        StockInfo 객체에 OHLC 및 수익률 정보를 보강하여 반환 (이름으로 직접 조회)
         """
         try:
-            # 1. Ticker 조회
-            ticker = self.ticker_mapper.get_ticker(stock.name)
-            if not ticker:
-                self.logger.info(f"      ⚠️  Ticker 찾을 수 없음: {stock.name}")
-                return stock
-
-            # 2. 상장일 파싱
+            # 1. 상장일 파싱
             if stock.listing_date in [None, "N/A", ""]:
                 self.logger.info(f"      ⚠️  상장일 정보 없음: {stock.name}")
                 return stock
@@ -48,16 +42,23 @@ class StockPriceEnricher(StockEnricherPort):
                 self.logger.info(f"      ⚠️  날짜 변환 실패: {stock.name} ({stock.listing_date}) - {e}")
                 return stock
 
-            # 3. OHLC 조회
-            ohlc = self.market_data_provider.get_ohlc(ticker, listing_date)
+            # 2. OHLC 조회 (이름으로 직접 조회)
+            ohlc = self.market_data_provider.get_ohlc(name=stock.name, target_date=listing_date)
+            
             if not ohlc:
-                self.logger.info(f"      ⚠️  OHLC 데이터 없음: {stock.name} ({ticker}, {listing_date})")
+                 # 티커로 한번 더 시도 (fallback)
+                ticker = self.ticker_mapper.get_ticker(stock.name)
+                if ticker:
+                    ohlc = self.market_data_provider.get_ohlc(ticker=ticker, target_date=listing_date)
+
+            if not ohlc:
+                self.logger.info(f"      ⚠️  OHLC 데이터 없음: {stock.name} ({listing_date})")
                 return stock
 
-            # 4. 수익률 계산
+            # 3. 수익률 계산
             growth_rate = self._calculate_growth_rate(ohlc['Close'], stock.confirmed_price)
 
-            # 5. 새로운 StockInfo 객체 생성
+            # 4. 새로운 StockInfo 객체 생성
             enriched_stock = replace(
                 stock,
                 open_price=ohlc['Open'],
@@ -78,19 +79,12 @@ class StockPriceEnricher(StockEnricherPort):
         """
         종목명, 상장일, 공모가를 받아 OHLC 및 수익률 딕셔너리 반환 (EnrichmentService용)
         """
-        # EnrichmentService용 OHLC 및 수익률 딕셔너리 반환
         result = {
             '시가': None, '고가': None, '저가': None, '종가': None, '수익률(%)': None
         }
 
         try:
-            # 1. Ticker 조회
-            ticker = self.ticker_mapper.get_ticker(stock_name)
-            if not ticker:
-                self.logger.info(f"    - [SKIP] Ticker 찾을 수 없음: {stock_name}")
-                return result
-
-            # 2. 상장일 파싱
+            # 1. 상장일 파싱
             if not listing_date_val or listing_date_val == "N/A":
                 self.logger.info(f"    - [SKIP] 상장일 정보 없음: {stock_name}")
                 return result
@@ -102,10 +96,17 @@ class StockPriceEnricher(StockEnricherPort):
                 self.logger.info(f"    - [SKIP] 날짜 변환 실패: {stock_name} ({listing_date_val}) - {e}")
                 return result
 
-            # 3. OHLC 조회
-            ohlc = self.market_data_provider.get_ohlc(ticker, listing_date)
+            # 2. OHLC 조회 (이름으로 직접 조회)
+            ohlc = self.market_data_provider.get_ohlc(name=stock_name, target_date=listing_date)
+            
             if not ohlc:
-                self.logger.info(f"    - [SKIP] OHLC 데이터 없음: {stock_name} ({ticker}, {listing_date})")
+                # Fallback: Ticker로 시도
+                ticker = self.ticker_mapper.get_ticker(stock_name)
+                if ticker:
+                    ohlc = self.market_data_provider.get_ohlc(ticker=ticker, target_date=listing_date)
+
+            if not ohlc:
+                self.logger.info(f"    - [SKIP] OHLC 데이터 없음: {stock_name} ({listing_date})")
                 return result
 
             result['시가'] = ohlc['Open']
@@ -113,12 +114,12 @@ class StockPriceEnricher(StockEnricherPort):
             result['저가'] = ohlc['Low']
             result['종가'] = ohlc['Close']
 
-            # 4. 수익률 계산
+            # 3. 수익률 계산
             confirmed_price = self._parse_price(confirmed_price_val)
             if confirmed_price:
                 growth_rate = self._calculate_growth_rate(ohlc['Close'], confirmed_price)
                 result['수익률(%)'] = growth_rate
-                self.logger.info(f"    - [OK] {stock_name} ({ticker}): 수익률 {growth_rate}%")
+                self.logger.info(f"    - [OK] {stock_name}: 수익률 {growth_rate}%")
             else:
                  self.logger.info(f"    - [WARN] 공모가 변환 실패: {stock_name} ({confirmed_price_val})")
 

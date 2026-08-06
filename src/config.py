@@ -17,7 +17,11 @@ class Settings(BaseSettings):
     # Google Drive Integration
     GOOGLE_CLIENT_SECRET_FILE: str = "secrets/client_secret.json"
     GOOGLE_TOKEN_FILE: str = "secrets/token.json"
-    GOOGLE_DRIVE_FOLDER_ID: str = ""  # .env에서 설정 필요
+    GOOGLE_DRIVE_FOLDER_ID: str = ""
+    
+    # KRX Credentials
+    KRX_USERNAME: str = ""
+    KRX_PASSWORD: str = ""
     
     # Logging
     LOG_LEVEL: str = "INFO"

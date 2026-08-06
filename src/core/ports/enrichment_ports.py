@@ -18,11 +18,15 @@ class TickerMapperPort(ABC):
 class MarketDataProviderPort(ABC):
     """시세 데이터를 조회하는 포트"""
     @abstractmethod
-    def get_ohlc(self, ticker: str, target_date: date) -> Optional[Dict[str, int]]:
+    def get_ohlc(
+        self, 
+        ticker: Optional[str] = None, 
+        name: Optional[str] = None, 
+        target_date: date = None
+    ) -> Optional[Dict[str, int]]:
         """
-        특정 날짜의 OHLC(시가, 고가, 저가, 종가) 데이터를 조회
-        Returns:
-            {"Open": 1000, "High": 1100, "Low": 900, "Close": 1050}
+        특정 날짜의 OHLC(시가, 고가, 저가, 종가) 데이터를 조회.
+        ticker 또는 name 중 하나는 반드시 제공되어야 함.
         """
         pass
 

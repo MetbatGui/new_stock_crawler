@@ -3,7 +3,7 @@ enrich-data 커맨드 — Parquet 저장소 기반 OHLC 보강
 """
 import typer
 from infra.adapters.data.parquet_repository import ParquetRepository
-from infra.adapters.data.pykrx_adapter import PyKrxAdapter
+from infra.adapters.data.krx_native_adapter import KrxNativeAdapter
 from infra.adapters.utils.console_logger import ConsoleLogger
 from core.services.stock_price_enricher import StockPriceEnricher
 from core.services.enrichment_service import EnrichmentService
@@ -32,10 +32,10 @@ def enrich_data():
     logger.info(f"전체 {len(yearly_data)}개 연도, {total}건 로드 완료")
 
     # 2. 보강 서비스 초기화
-    pykrx_adapter = PyKrxAdapter()
+    krx_adapter = KrxNativeAdapter()
     stock_enricher = StockPriceEnricher(
-        ticker_mapper=pykrx_adapter,
-        market_data_provider=pykrx_adapter,
+        ticker_mapper=krx_adapter,
+        market_data_provider=krx_adapter,
         logger=logger,
     )
 

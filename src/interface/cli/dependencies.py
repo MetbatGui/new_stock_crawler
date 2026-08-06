@@ -12,7 +12,7 @@ from infra.adapters.web.calendar_scraper_adapter import CalendarScraperAdapter
 from infra.adapters.web.detail_scraper_adapter import DetailScraperAdapter
 from infra.adapters.data.dataframe_mapper import DataFrameMapper
 from infra.adapters.data.parquet_repository import ParquetRepository
-from infra.adapters.data.pykrx_adapter import PyKrxAdapter
+from infra.adapters.data.krx_native_adapter import KrxNativeAdapter
 
 
 def build_dependencies(headless: bool = True) -> Dict[str, Any]:
@@ -30,7 +30,7 @@ def build_dependencies(headless: bool = True) -> Dict[str, Any]:
     date_calculator = DateCalculator()
 
     # 2. 데이터 어댑터
-    pykrx_adapter = PyKrxAdapter()
+    krx_adapter = KrxNativeAdapter()
     data_mapper = DataFrameMapper()
 
     # 3. 저장소 (Parquet)
@@ -38,8 +38,8 @@ def build_dependencies(headless: bool = True) -> Dict[str, Any]:
 
     # 4. OHLC 보강
     stock_enricher = StockPriceEnricher(
-        ticker_mapper=pykrx_adapter,
-        market_data_provider=pykrx_adapter,
+        ticker_mapper=krx_adapter,
+        market_data_provider=krx_adapter,
         logger=logger,
     )
 
