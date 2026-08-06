@@ -39,7 +39,12 @@ def sync_changed_years_to_drive(
             logger.error(f"   ⚠️  [{year}년] Excel Drive 업로드 실패: {e}")
 
     # 2. db/{year}.db 나중 (db 서브폴더로)
-    db_folder_id = storage.get_or_create_subfolder("db")
+    try:
+        db_folder_id = storage.get_or_create_subfolder("db")
+    except Exception as e:
+        logger.error(f"   ⚠️  Google Drive db 서브폴더 조회/생성 실패: {e}")
+        return
+
     for year in sorted(years):
         db_path = config.DB_DIR / f"{year}.db"
         if not db_path.exists():
