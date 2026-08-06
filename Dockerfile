@@ -40,13 +40,24 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
+# Cron (컨테이너 내장 스케줄러 - docker-compose의 crawler-cron 서비스에서 사용)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends cron tzdata \
+    && rm -rf /var/lib/apt/lists/*
+ENV TZ=Asia/Seoul
+
+COPY docker/crontab /etc/cron.d/crawler-cron
+RUN chmod 0644 /etc/cron.d/crawler-cron \
+    && chmod +x /app/docker/run-crawl.sh /app/docker/cron-entrypoint.sh
+
 # Change ownership of the app directory to nonroot user
 RUN chown -R nonroot:nonroot /app
 
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
 
-# Use the non-root user to run our application
+# Use the non-root user to run our application (crawler-cron 서비스는
+# docker-compose.yml에서 user: root로 오버라이드 - cron 데몬 기동에 root 필요)
 USER nonroot
 
 # Default command

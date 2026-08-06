@@ -25,7 +25,7 @@ def daily_update(
     ),
 ):
     """
-    일일 업데이트 (GitHub Actions용)
+    일일 업데이트 (스케줄 실행용 - docker-compose의 crawler-cron 서비스가 매일 호출)
 
     당일 + 향후 3일의 IPO 데이터를 크롤링하여 SQLite 저장소(db/)에 upsert한 뒤,
     당해연도(1월이면 전년도까지) 데이터를 대상으로 OHLC 가격 백필을 수행합니다.
