@@ -1,6 +1,9 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Optional
 from playwright.sync_api import Page, Locator
+
+logger = logging.getLogger("crawler")
 
 
 class TableFinderStrategy(ABC):
@@ -26,7 +29,7 @@ class TitleSiblingTableFinder(TableFinderStrategy):
                 "/following-sibling::table[1]"
             ).first
             if table.is_visible(timeout=1500):
-                print("      [정보] 전략1 성공: 제목 다음 형제 테이블 발견")
+                logger.info("      [정보] 전략1 성공: 제목 다음 형제 테이블 발견")
                 return table
         except Exception:
             pass
@@ -45,7 +48,7 @@ class TitleFollowingTableFinder(TableFinderStrategy):
                 "/following::table[1]"
             ).first
             if table.is_visible(timeout=1500):
-                print("      [정보] 전략2 성공: 제목 이후 첫 테이블 발견")
+                logger.info("      [정보] 전략2 성공: 제목 이후 첫 테이블 발견")
                 return table
         except Exception:
             pass
@@ -66,7 +69,9 @@ class HeaderContentTableFinder(TableFinderStrategy):
                 "]"
             ).last
             if table.is_visible(timeout=1500):
-                print("      [정보] 전략3 성공: 헤더 구조(의무보호예수+유통가능) 일치")
+                logger.info(
+                    "      [정보] 전략3 성공: 헤더 구조(의무보호예수+유통가능) 일치"
+                )
                 return table
         except Exception:
             pass
@@ -88,7 +93,7 @@ class RowContentTableFinder(TableFinderStrategy):
                 "]"
             ).last
             if table.is_visible(timeout=1500):
-                print("      [정보] 전략4 성공: 합계 행 패턴 일치")
+                logger.info("      [정보] 전략4 성공: 합계 행 패턴 일치")
                 return table
         except Exception:
             pass

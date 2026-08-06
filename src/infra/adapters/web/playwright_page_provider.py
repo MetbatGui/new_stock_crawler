@@ -2,9 +2,13 @@
 Playwright Page 제공 어댑터
 """
 
+import logging
+
 from playwright.sync_api import Browser, Page, Playwright, sync_playwright
 from core.ports.web_scraping_ports import PageProvider
 from config import config
+
+logger = logging.getLogger("crawler")
 
 
 class PlaywrightPageProvider(PageProvider):
@@ -29,8 +33,8 @@ class PlaywrightPageProvider(PageProvider):
             self.browser = self.playwright.chromium.launch(headless=self.headless)
             self.page = self.browser.new_page()
         except Exception as e:
-            print(f"Playwright 브라우저 시작 중 오류 발생: {e}")
-            print("   [팁] 'playwright install' 명령어를 실행했는지 확인하세요.")
+            logger.error(f"Playwright 브라우저 시작 중 오류 발생: {e}")
+            logger.error("   [팁] 'playwright install' 명령어를 실행했는지 확인하세요.")
             raise
 
     def get_page(self) -> Page:

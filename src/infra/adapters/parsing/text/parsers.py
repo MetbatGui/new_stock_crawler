@@ -1,5 +1,8 @@
+import logging
 import re
 from typing import Optional, Tuple
+
+logger = logging.getLogger("crawler")
 
 
 def parse_to_int(text: str, context: str = "") -> Optional[int]:
@@ -25,7 +28,7 @@ def parse_to_int(text: str, context: str = "") -> Optional[int]:
         msg = f"      [경고] 정수 변환 실패: '{text}'"
         if context:
             msg += f" | 항목: {context}"
-        print(msg)
+        logger.warning(msg)
         return None
 
 
@@ -64,7 +67,9 @@ def clean_tradable_values(count: str, percent: str) -> Tuple[str, str]:
 
     # % 기호로 주식수/지분율 순서가 바뀌었는지 감지하고 교정
     if count.endswith("%") and not percent.endswith("%"):
-        print("      [경고] 주식수와 지분율 순서가 바뀐 것으로 감지됨. 순서 교정.")
+        logger.warning(
+            "      [경고] 주식수와 지분율 순서가 바뀐 것으로 감지됨. 순서 교정."
+        )
         count, percent = percent, count
 
     return count, percent

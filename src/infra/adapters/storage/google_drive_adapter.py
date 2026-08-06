@@ -2,6 +2,7 @@
 Google Drive 저장소 어댑터 구현
 """
 
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -13,6 +14,8 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from core.ports.storage_ports import StoragePort
 from config import config
+
+logger = logging.getLogger("crawler")
 
 
 class GoogleDriveAdapter(StoragePort):
@@ -51,7 +54,9 @@ class GoogleDriveAdapter(StoragePort):
                 try:
                     self._creds.refresh(Request())
                 except Exception as e:
-                    print(f"      [Google Drive] 토큰 갱신 실패, 재인증 필요: {e}")
+                    logger.warning(
+                        f"      [Google Drive] 토큰 갱신 실패, 재인증 필요: {e}"
+                    )
                     self._creds = None
 
             # 토큰이 없거나 갱신 실패 시, 여기서는 자동으로 브라우저를 띄우지 않습니다.
@@ -116,7 +121,9 @@ class GoogleDriveAdapter(StoragePort):
             if existing_files:
                 # 2. 덮어쓰기 (Update)
                 file_id = existing_files[0]["id"]
-                print(f"      [Google Drive] 기존 파일 업데이트 중... (ID: {file_id})")
+                logger.info(
+                    f"      [Google Drive] 기존 파일 업데이트 중... (ID: {file_id})"
+                )
 
                 file = (
                     self._service.files()
@@ -124,14 +131,14 @@ class GoogleDriveAdapter(StoragePort):
                     .execute()
                 )
 
-                print(
+                logger.info(
                     f"      [Google Drive] 업데이트 완료: {file_name} (ID: {file.get('id')})"
                 )
                 return file.get("id")
 
             else:
                 # 3. 새로 만들기 (Create)
-                print(f"      [Google Drive] 새 파일 업로드 중...: {file_name}")
+                logger.info(f"      [Google Drive] 새 파일 업로드 중...: {file_name}")
 
                 file_metadata = {
                     "name": file_name,
@@ -144,12 +151,12 @@ class GoogleDriveAdapter(StoragePort):
                     .execute()
                 )
 
-                print(
+                logger.info(
                     f"      [Google Drive] 업로드 완료: {file_name} (ID: {file.get('id')})"
                 )
                 return file.get("id")
         except Exception as e:
-            print(f"      [Google Drive] 업로드 실패: {local_path.name} - {e}")
+            logger.error(f"      [Google Drive] 업로드 실패: {local_path.name} - {e}")
             return None
 
     def get_or_create_subfolder(self, name: str) -> Optional[str]:
@@ -179,10 +186,12 @@ class GoogleDriveAdapter(StoragePort):
                 "parents": [self.folder_id] if self.folder_id else [],
             }
             folder = self._service.files().create(body=metadata, fields="id").execute()
-            print(f"      [Google Drive] 서브폴더 생성: {name} (ID: {folder['id']})")
+            logger.info(
+                f"      [Google Drive] 서브폴더 생성: {name} (ID: {folder['id']})"
+            )
             return folder["id"]
         except Exception as e:
-            print(f"      [Google Drive] 서브폴더 조회/생성 실패: {name} - {e}")
+            logger.error(f"      [Google Drive] 서브폴더 조회/생성 실패: {name} - {e}")
             return None
 
     def list_files(
@@ -231,12 +240,12 @@ class GoogleDriveAdapter(StoragePort):
                 if not page_token:
                     break
 
-            print(
+            logger.info(
                 f"      [Google Drive] 파일 목록 조회 완료 (Query: {query}, Found: {len(all_files)}개)"
             )
             return all_files
         except Exception as e:
-            print(f"      [Google Drive] 파일 목록 조회 실패: {e}")
+            logger.error(f"      [Google Drive] 파일 목록 조회 실패: {e}")
             return []
 
     def download_file(self, file_id: str, local_path: Path) -> bool:
@@ -262,8 +271,8 @@ class GoogleDriveAdapter(StoragePort):
                 while done is False:
                     status, done = downloader.next_chunk()
 
-            print(f"      [Google Drive] 다운로드 완료: {local_path}")
+            logger.info(f"      [Google Drive] 다운로드 완료: {local_path}")
             return True
         except Exception as e:
-            print(f"      [Google Drive] 다운로드 실패: {file_id} - {e}")
+            logger.error(f"      [Google Drive] 다운로드 실패: {file_id} - {e}")
             return False

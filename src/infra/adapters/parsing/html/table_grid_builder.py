@@ -1,5 +1,8 @@
+import logging
 from typing import List, Tuple
 from playwright.sync_api import Locator
+
+logger = logging.getLogger("crawler")
 
 
 class TableGridBuilder:
@@ -22,7 +25,7 @@ class TableGridBuilder:
 
             return grid
         except Exception as e:
-            print(f"      [오류] 테이블 그리드 변환 중 예외: {e}")
+            logger.error(f"      [오류] 테이블 그리드 변환 중 예외: {e}")
             return []
 
     def _calculate_max_columns(self, rows: List[Locator]) -> int:
