@@ -7,6 +7,7 @@ from typing import Any, Dict
 from core.services.crawler_service import CrawlerService
 from core.services.stock_price_enricher import StockPriceEnricher
 from core.services.enrichment_service import EnrichmentService
+from core.services.crawl_orchestrator_service import CrawlOrchestratorService
 from infra.adapters.utils.console_logger import ConsoleLogger
 from infra.adapters.utils.date_calculator import DateCalculator
 from infra.adapters.web.playwright_page_provider import PlaywrightPageProvider
@@ -66,9 +67,18 @@ def build_dependencies(headless: bool = True) -> Dict[str, Any]:
         logger=logger,
     )
 
+    # 7. 오케스트레이터 (크롤링 + 가격 백필을 조합해 실행, Drive 동기화는 CLI가 별도 처리)
+    orchestrator = CrawlOrchestratorService(
+        crawler=crawler_service,
+        enrichment=enrichment_service,
+        repository=repository,
+        logger=logger,
+    )
+
     return {
         "crawler": crawler_service,
         "enrichment": enrichment_service,
+        "orchestrator": orchestrator,
         "page_provider": page_provider,
         "logger": logger,
         "repository": repository,

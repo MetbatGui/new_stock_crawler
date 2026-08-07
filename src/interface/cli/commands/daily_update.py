@@ -54,26 +54,19 @@ def daily_update(
         deps["logger"].info("=" * 60)
 
         deps["page_provider"].setup()
-        new_data = deps["crawler"].run_scheduled(start_date=parsed_date, days_ahead=3)
+        result = deps["orchestrator"].run_daily(target_date=parsed_date, days_ahead=3)
 
-        if new_data:
-            total_count = sum(len(df) for df in new_data.values())
-            deps["logger"].info(f"✅ 총 {total_count}건 SQLite 저장 완료")
+        if result.collected_count:
+            deps["logger"].info(f"✅ 총 {result.collected_count}건 SQLite 저장 완료")
         else:
             deps["logger"].info("ℹ️  수집된 상장 정보 없음")
 
-        # 당해연도(1월이면 전년도 포함) OHLC 가격 백필 — DB 상태 기준으로 누락분만 채움
-        backfill_years = [date.today().year]
-        if date.today().month == 1:
-            backfill_years.append(date.today().year - 1)
-        backfill_data = {y: deps["repository"].load(y) for y in backfill_years}
-        enriched_years = deps["enrichment"].enrich_data(backfill_data)
-
-        changed_years = set(new_data.keys()) | enriched_years
-        if drive and changed_years:
-            deps["logger"].info(f"☁️  Drive 동기화 대상 연도: {sorted(changed_years)}")
+        if drive and result.changed_years:
+            deps["logger"].info(
+                f"☁️  Drive 동기화 대상 연도: {sorted(result.changed_years)}"
+            )
             sync_changed_years_to_drive(
-                deps["repository"], changed_years, deps["logger"]
+                deps["repository"], result.changed_years, deps["logger"]
             )
 
         deps["logger"].info("🏁 일일 업데이트 완료")

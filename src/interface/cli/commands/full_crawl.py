@@ -36,20 +36,20 @@ def full_crawl(
         deps["logger"].info("=" * 60)
 
         deps["page_provider"].setup()
-        crawl_result = deps["crawler"].run(start_year=start_year)
+        result = deps["orchestrator"].run_full(start_year=start_year)
 
-        # 저장된 전체 연도를 대상으로 OHLC 가격 백필 (DB 상태 기준으로 누락분만 채움)
-        enriched_years = deps["enrichment"].enrich_data(deps["repository"].load_all())
-
-        changed_years = set(crawl_result.keys()) | enriched_years
-        if drive and changed_years:
-            deps["logger"].info(f"☁️  Drive 동기화 대상 연도: {sorted(changed_years)}")
+        if drive and result.changed_years:
+            deps["logger"].info(
+                f"☁️  Drive 동기화 대상 연도: {sorted(result.changed_years)}"
+            )
             sync_changed_years_to_drive(
-                deps["repository"], changed_years, deps["logger"]
+                deps["repository"], result.changed_years, deps["logger"]
             )
 
         deps["logger"].info("=" * 60)
-        deps["logger"].info("🏁 크롤링 완료 → SQLite 저장됨")
+        deps["logger"].info(
+            f"🏁 크롤링 완료 → SQLite 저장됨 ({result.collected_count}건 신규 수집)"
+        )
         deps["logger"].info("💡 Excel 내보내기: uv run crawler export-excel")
         deps["logger"].info("=" * 60)
 
