@@ -1,4 +1,4 @@
 #!/bin/sh
 set -e
 cd /app
-crawler daily --drive
+/app/.venv/bin/crawler daily --drive
