@@ -78,18 +78,19 @@ class KrxTradingCalendar(TradingCalendarPort):
         try:
             otp = self._request_otp()
             rows = self._request_holiday_rows(year, otp)
+            holidays = set()
+            for row in rows:
+                date_str = row.get("calnd_dd")
+                if date_str:
+                    y, m, d = map(int, date_str.split("-"))
+                    holidays.add(date(y, m, d))
         except Exception as e:
-            # 조회 실패 시 빈 집합 반환 - is_trading_day가 주말 외엔 모두
-            # 거래일로 간주하게 되어(보수적 기본값) 크롤링을 건너뛰지 않는다.
+            # 조회/파싱 실패 시 빈 집합으로 대체 - is_trading_day가 주말 외엔
+            # 모두 거래일로 간주하게 되어(보수적 기본값) 크롤링을 건너뛰지 않는다.
+            # 이 결과도 캐싱해서, 같은 실행 안의 나머지 날짜들이 매번 재시도로
+            # 시간을 낭비하지 않게 한다(다음 실행 때는 새 인스턴스라 다시 시도됨).
             logger.warning(f"[KRX] {year}년 휴장일 조회 실패, 빈 목록으로 대체: {e}")
-            return set()
-
-        holidays = set()
-        for row in rows:
-            date_str = row.get("calnd_dd")
-            if date_str:
-                y, m, d = map(int, date_str.split("-"))
-                holidays.add(date(y, m, d))
+            holidays = set()
 
         self._holidays_cache[year] = holidays
         return holidays
