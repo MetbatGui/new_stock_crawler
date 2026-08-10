@@ -156,7 +156,34 @@ replaced by CRLF" 경고를 확인했습니다. Windows에서 `core.autocrlf`가
 않습니다. `docker-compose.yml`에서 **`crawler-cron` 서비스만** `user: root`로 오버라이드
 (1회성 실행용 `crawler` 서비스는 기본 `nonroot` 유지).
 
-### 3.4 실제 배포로 검증
+후속 조치: 이 root 권한이 cron 데몬 기동/`/proc/1/fd/1` 리다이렉션에만 필요하고
+실제 크롤링(Playwright 브라우저/외부 HTTP 요청/Drive 업로드)에는 불필요하다는 걸
+나중에 알아채고, `run-crawl.sh`에서 `su -s /bin/sh -c '...' nonroot`로 **실제 작업만**
+nonroot로 내려 실행하도록 좁혔습니다. 리다이렉션은 root 셸이 이미 열어둔 파일
+디스크립터를 `su`의 자식 프로세스가 그대로 상속하므로(권한 체크는 `open()` 시점에만
+일어남) nonroot로 낮춰도 로그는 계속 정상적으로 써집니다. `docker run --user root ...`로
+fd 상속 동작과, 마운트된 볼륨(`db/`, `output/`)에 nonroot가 실제로 쓸 수 있는지를
+직접 검증한 뒤 적용.
+
+**교훈:** "cron 데몬 기동에 root가 필요하다"가 "그 잡이 하는 모든 일에 root가
+필요하다"를 의미하지 않음. root가 필요한 건 데몬 기동/fd 권한뿐이므로, 실제 페이로드는
+`su`/`gosu`로 최대한 좁은 권한으로 실행할 것.
+
+### 3.4 cron 잡이 Dockerfile의 `ENV PATH`를 상속받지 못함
+
+실제 배포 후 로그에서 `run-crawl.sh: 4: crawler: not found`를 발견했습니다.
+Dockerfile에서 `ENV PATH="/app/.venv/bin:$PATH"`로 가상환경을 PATH에 걸어뒀지만, 이는
+**컨테이너 기동 시 최초 프로세스(그리고 그 자식들)**에만 적용되는 환경변수이고, cron
+데몬이 그 이후 스폰하는 잡 프로세스는 이 PATH를 물려받지 않습니다(cron은 최소 PATH
+`/usr/bin:/bin`으로 잡을 실행). `run-crawl.sh`에서 `crawler`를 절대경로
+(`/app/.venv/bin/crawler`)로 호출하도록 수정해 해결.
+
+**교훈:** Dockerfile의 `ENV`는 cron처럼 **자체적으로 새 환경을 구성해 잡을 스폰하는
+데몬** 안에서는 상속되지 않을 수 있음. cron 잡 스크립트는 PATH에 의존하지 말고
+절대경로로 실행할 것 — `docker build`만으로는 안 잡히고, 실제 스케줄이 발화되는 걸
+봐야 발견됨(2.6/3.5와 같은 종류의 함정).
+
+### 3.5 실제 배포로 검증
 
 `docker build` → `docker run`으로 이미지 빌드/CLI 동작을 먼저 확인하고, `docker compose up
 -d crawler-cron`으로 실제 배포한 뒤:
@@ -196,6 +223,12 @@ replaced by CRLF" 경고를 확인했습니다. Windows에서 `core.autocrlf`가
     해당 서비스만 root로 오버라이드하고 나머지는 nonroot 유지.
 11. **실제 이미지를 빌드/기동해서 검증**: 볼륨, 권한, 환경변수 로딩 방식(파일 직접 읽기
     vs OS 환경변수 주입)이 로컬 실행과 다를 수 있음.
+12. **cron 잡 스크립트는 PATH에 의존하지 말 것**: Dockerfile의 `ENV PATH`는 cron이
+    스폰하는 잡 프로세스에 상속되지 않음. 실행 파일은 절대경로로 호출.
+13. **cron 데몬 기동에 root가 필요해도, 실제 작업까지 root로 돌리지 말 것**: 데몬
+    기동/fd 권한에만 root가 필요하면 `su`/`gosu`로 실제 페이로드는 nonroot로 내릴 것
+    (fd는 `open()` 시점에만 권한 체크되므로 root가 먼저 열어둔 리다이렉션은 자식이
+    nonroot여도 그대로 상속됨).
 
 ---
 
