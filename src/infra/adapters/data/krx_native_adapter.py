@@ -2,20 +2,11 @@ import requests
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import date, timedelta
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from core.ports.enrichment_ports import TickerMapperPort, MarketDataProviderPort
+from infra.adapters.utils.network_retry import network_retry
 
 logger = logging.getLogger("crawler")
-
-# KRX 서버 일시 장애/타임아웃 등 네트워크 계층 오류에 한해 재시도 (HTTP 응답은
-# 이미 호출부에서 status_code/JSON 파싱 실패를 정상적으로 처리하므로 대상 아님)
-_network_retry = retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=8),
-    retry=retry_if_exception_type(requests.exceptions.RequestException),
-    reraise=True,
-)
 
 
 def _resolve_name(table: Dict[str, Any], stock_name: str) -> Optional[Any]:
@@ -61,11 +52,11 @@ class KrxNativeAdapter(TickerMapperPort, MarketDataProviderPort):
             }
         )
 
-    @_network_retry
+    @network_retry
     def _get(self, url: str, **kwargs) -> requests.Response:
         return self.session.get(url, **kwargs)
 
-    @_network_retry
+    @network_retry
     def _post(self, url: str, **kwargs) -> requests.Response:
         return self.session.post(url, **kwargs)
 
