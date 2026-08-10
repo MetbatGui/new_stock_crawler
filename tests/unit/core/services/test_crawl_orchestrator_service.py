@@ -26,7 +26,9 @@ def mock_enrichment():
 
 @pytest.fixture
 def mock_repository():
-    return MagicMock()
+    repo = MagicMock()
+    repo.get_last_crawl_date.return_value = None
+    return repo
 
 
 @pytest.fixture
@@ -122,3 +124,45 @@ class TestRunDaily:
 
         assert result.collected_count == 3
         assert result.changed_years == {2023, 2024}
+
+    def test_records_last_crawl_date_after_run(
+        self, orchestrator, mock_crawler, mock_enrichment, mock_repository
+    ):
+        mock_crawler.run_scheduled.return_value = {}
+        mock_enrichment.enrich_data.return_value = set()
+
+        orchestrator.run_daily(target_date=date(2024, 6, 1), today=date(2024, 6, 15))
+
+        mock_repository.set_last_crawl_date.assert_called_once_with(date(2024, 6, 1))
+
+    def test_expands_days_back_when_gap_since_last_crawl_exceeds_default(
+        self, orchestrator, mock_crawler, mock_enrichment, mock_repository
+    ):
+        """마지막 크롤링일과의 공백이 기본 days_back(7일)보다 크면 그 공백만큼 확장해야 한다"""
+        mock_repository.get_last_crawl_date.return_value = date(2024, 5, 1)
+        mock_crawler.run_scheduled.return_value = {}
+        mock_enrichment.enrich_data.return_value = set()
+
+        orchestrator.run_daily(
+            target_date=date(2024, 6, 1), days_back=7, today=date(2024, 6, 15)
+        )
+
+        # 5/1 ~ 6/1 사이 공백은 30일 (5/2~5/31)
+        mock_crawler.run_scheduled.assert_called_once_with(
+            start_date=date(2024, 6, 1), days_ahead=3, days_back=30
+        )
+
+    def test_keeps_default_days_back_when_gap_is_small(
+        self, orchestrator, mock_crawler, mock_enrichment, mock_repository
+    ):
+        mock_repository.get_last_crawl_date.return_value = date(2024, 5, 30)
+        mock_crawler.run_scheduled.return_value = {}
+        mock_enrichment.enrich_data.return_value = set()
+
+        orchestrator.run_daily(
+            target_date=date(2024, 6, 1), days_back=7, today=date(2024, 6, 15)
+        )
+
+        mock_crawler.run_scheduled.assert_called_once_with(
+            start_date=date(2024, 6, 1), days_ahead=3, days_back=7
+        )

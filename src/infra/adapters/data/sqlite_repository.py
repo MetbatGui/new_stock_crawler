@@ -4,6 +4,7 @@ SQLite 기반 저장소 어댑터 구현
 
 import os
 import sqlite3
+from datetime import date
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -34,6 +35,9 @@ class SqliteRepository(RepositoryPort):
 
     def _path(self, year: int) -> Path:
         return self._base_dir / f"{year}.db"
+
+    def _meta_path(self) -> Path:
+        return self._base_dir / "meta.db"
 
     # ------------------------------------------------------------------ #
     #  Write                                                               #
@@ -123,3 +127,35 @@ class SqliteRepository(RepositoryPort):
             except ValueError:
                 continue
         return sorted(years)
+
+    # ------------------------------------------------------------------ #
+    #  마지막 크롤링 기준일 (연도별 파일과 별개로 meta.db에 단일 값 기록)      #
+    # ------------------------------------------------------------------ #
+
+    def get_last_crawl_date(self) -> Optional[date]:
+        path = self._meta_path()
+        if not path.exists():
+            return None
+        conn = sqlite3.connect(path)
+        try:
+            row = conn.execute(
+                "SELECT value FROM meta WHERE key = 'last_crawl_date'"
+            ).fetchone()
+            return date.fromisoformat(row[0]) if row else None
+        finally:
+            conn.close()
+
+    def set_last_crawl_date(self, value: date) -> None:
+        conn = sqlite3.connect(self._meta_path())
+        try:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)"
+            )
+            conn.execute(
+                "INSERT INTO meta (key, value) VALUES ('last_crawl_date', ?) "
+                "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (value.isoformat(),),
+            )
+            conn.commit()
+        finally:
+            conn.close()

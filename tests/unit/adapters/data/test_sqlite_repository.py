@@ -4,6 +4,7 @@ SqliteRepository 단위 테스트
 
 import pytest
 import pandas as pd
+from datetime import date
 from pathlib import Path
 
 from infra.adapters.data.sqlite_repository import SqliteRepository
@@ -152,3 +153,27 @@ class TestSqliteRepository:
         # 2. 임시 파일(.db.tmp)이 삭제되어야 함
         tmp_file = path.with_suffix(".db.tmp")
         assert not tmp_file.exists()
+
+    def test_get_last_crawl_date_returns_none_when_never_set(
+        self, repo: SqliteRepository
+    ):
+        assert repo.get_last_crawl_date() is None
+
+    def test_set_and_get_last_crawl_date_roundtrip(self, repo: SqliteRepository):
+        repo.set_last_crawl_date(date(2024, 6, 1))
+        assert repo.get_last_crawl_date() == date(2024, 6, 1)
+
+    def test_set_last_crawl_date_overwrites_previous_value(
+        self, repo: SqliteRepository
+    ):
+        repo.set_last_crawl_date(date(2024, 6, 1))
+        repo.set_last_crawl_date(date(2024, 6, 2))
+        assert repo.get_last_crawl_date() == date(2024, 6, 2)
+
+    def test_meta_db_not_picked_up_as_year(
+        self, repo: SqliteRepository, sample_df: pd.DataFrame
+    ):
+        """meta.db는 연도 파일이 아니므로 get_available_years에서 제외되어야 한다"""
+        repo.save(2024, sample_df)
+        repo.set_last_crawl_date(date(2024, 6, 1))
+        assert repo.get_available_years() == [2024]

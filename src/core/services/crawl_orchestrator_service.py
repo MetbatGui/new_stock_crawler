@@ -66,13 +66,25 @@ class CrawlOrchestratorService:
         Args:
             target_date: 크롤링 기준 날짜
             days_ahead: 향후 며칠까지 수집할지
-            days_back: 과거 며칠까지 재수집할지 (크론이 며칠 못 돈 경우 대비)
+            days_back: 과거 며칠까지 재수집할지 최소값 (크론이 며칠 못 돈 경우 대비).
+                DB에 기록된 마지막 크롤링일과의 공백이 이보다 크면 그 공백만큼 확장된다.
             today: 백필 대상 연도 판단 기준 (기본값 date.today(), 테스트용 주입 지점)
         """
+        last_crawl = self.repository.get_last_crawl_date()
+        if last_crawl is not None:
+            gap_days = (target_date - last_crawl).days - 1
+            if gap_days > days_back:
+                self.logger.info(
+                    f"마지막 크롤링일({last_crawl}) 이후 공백 {gap_days}일 감지 - "
+                    f"백필 범위를 {days_back}일에서 {gap_days}일로 확장"
+                )
+                days_back = gap_days
+
         crawl_result = self.crawler.run_scheduled(
             start_date=target_date, days_ahead=days_ahead, days_back=days_back
         )
         collected_count = sum(len(df) for df in crawl_result.values())
+        self.repository.set_last_crawl_date(target_date)
 
         # 당해연도(1월이면 전년도 포함) OHLC 가격 백필 — DB 상태 기준으로 누락분만 채움
         anchor = today or date.today()

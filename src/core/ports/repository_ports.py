@@ -3,7 +3,8 @@
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from datetime import date
+from typing import Dict, List, Optional
 import pandas as pd
 
 
@@ -57,4 +58,19 @@ class RepositoryPort(ABC):
         """
         저장된 데이터가 있는 연도 목록 반환 (오름차순)
         """
+        pass
+
+    @abstractmethod
+    def get_last_crawl_date(self) -> Optional[date]:
+        """
+        마지막으로 daily 크롤링이 완료된 기준 날짜. 기록 없으면 None.
+
+        IPO 상장 row는 상장이 있었던 날만 존재해 "그날 0건"과 "안 긁음"을
+        구분 못 하므로, 이 값으로 실행 여부 자체를 별도 추적한다.
+        """
+        pass
+
+    @abstractmethod
+    def set_last_crawl_date(self, value: date) -> None:
+        """daily 크롤링 완료 후 기준 날짜를 기록 (다음 실행의 백필 범위 판단용)"""
         pass
