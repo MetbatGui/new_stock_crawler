@@ -2,10 +2,20 @@ import requests
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import date, timedelta
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from core.ports.enrichment_ports import TickerMapperPort, MarketDataProviderPort
 
 logger = logging.getLogger("crawler")
+
+# KRX 서버 일시 장애/타임아웃 등 네트워크 계층 오류에 한해 재시도 (HTTP 응답은
+# 이미 호출부에서 status_code/JSON 파싱 실패를 정상적으로 처리하므로 대상 아님)
+_network_retry = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    retry=retry_if_exception_type(requests.exceptions.RequestException),
+    reraise=True,
+)
 
 
 def _resolve_name(table: Dict[str, Any], stock_name: str) -> Optional[Any]:
@@ -51,6 +61,14 @@ class KrxNativeAdapter(TickerMapperPort, MarketDataProviderPort):
             }
         )
 
+    @_network_retry
+    def _get(self, url: str, **kwargs) -> requests.Response:
+        return self.session.get(url, **kwargs)
+
+    @_network_retry
+    def _post(self, url: str, **kwargs) -> requests.Response:
+        return self.session.post(url, **kwargs)
+
     def _login(self) -> bool:
         """KRX 정보데이터시스템 로그인 세션을 획득한다."""
         if not self.mbr_id or not self.pw:
@@ -64,14 +82,14 @@ class KrxNativeAdapter(TickerMapperPort, MarketDataProviderPort):
 
         try:
             # 초기 페이지 접근으로 세션 초기화
-            self.session.get(self._REF)
+            self._get(self._REF)
 
-            resp = self.session.post(login_url, data=payload)
+            resp = self._post(login_url, data=payload)
             data = resp.json()
 
             if data.get("_error_code") == "CD011":  # 중복 로그인 처리
                 payload["skipDup"] = "Y"
-                resp = self.session.post(login_url, data=payload)
+                resp = self._post(login_url, data=payload)
                 data = resp.json()
 
             if data.get("_error_code") == "CD001":
@@ -106,7 +124,7 @@ class KrxNativeAdapter(TickerMapperPort, MarketDataProviderPort):
                 "csvxls_isNo": "false",
             }
 
-            res = self.session.post(self.api_url, data=payload, timeout=15)
+            res = self._post(self.api_url, data=payload, timeout=15)
             if res.status_code != 200:
                 return []
 

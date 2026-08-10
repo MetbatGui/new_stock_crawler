@@ -37,6 +37,18 @@ class DateRangeCalculatorPort(ABC):
         pass
 
 
+class TradingCalendarPort(ABC):
+    """
+    KRX 개장일(거래일) 판별 포트
+
+    책임: 특정 날짜가 KRX 거래일인지 판별 (주말 + 공휴일 + 임시휴장 포함)
+    """
+
+    @abstractmethod
+    def is_trading_day(self, target_date: date) -> bool:
+        pass
+
+
 class LoggerPort(ABC):
     """
     로깅 포트

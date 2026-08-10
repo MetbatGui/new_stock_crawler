@@ -1,6 +1,10 @@
 import unittest
 from datetime import date
+from unittest.mock import MagicMock, patch
+
 import pytest
+import requests
+
 from infra.adapters.data.krx_native_adapter import KrxNativeAdapter, _resolve_name
 
 
@@ -54,6 +58,47 @@ class TestResolveName(unittest.TestCase):
     def test_whitespace_only_difference_still_matches(self):
         table = {"삼성전자": "005930"}
         self.assertEqual(_resolve_name(table, "삼성전자 "), "005930")
+
+
+class TestFetchAllMarketsRetry(unittest.TestCase):
+    """네트워크 계층 일시 오류에 대한 tenacity 재시도 동작 검증 (네트워크 의존 없음)"""
+
+    def setUp(self):
+        sleep_patcher = patch("tenacity.nap.time.sleep", lambda _: None)
+        sleep_patcher.start()
+        self.addCleanup(sleep_patcher.stop)
+        self.adapter = KrxNativeAdapter(mbr_id="u", pw="p")
+        self.adapter.is_logged_in = True
+
+    def test_retries_then_succeeds_on_transient_connection_error(self):
+        call_count = {"n": 0}
+
+        def flaky_post(url, data=None, timeout=None):
+            call_count["n"] += 1
+            if call_count["n"] < 3:
+                raise requests.exceptions.ConnectionError("boom")
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.json.return_value = {"OutBlock_1": []}
+            return resp
+
+        with patch.object(self.adapter.session, "post", side_effect=flaky_post):
+            result = self.adapter._fetch_all_markets("20240311")
+
+        self.assertEqual(call_count["n"], 3)
+        self.assertEqual(result, [])
+
+    def test_gives_up_after_max_attempts(self):
+        with patch.object(
+            self.adapter.session,
+            "post",
+            side_effect=requests.exceptions.ConnectionError("boom"),
+        ) as mock_post:
+            # _fetch_all_markets가 예외를 삼켜 [] 반환하므로 시도 횟수로 검증
+            result = self.adapter._fetch_all_markets("20240311")
+
+        self.assertEqual(mock_post.call_count, 3)
+        self.assertEqual(result, [])
 
 
 if __name__ == "__main__":

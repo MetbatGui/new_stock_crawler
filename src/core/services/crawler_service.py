@@ -13,7 +13,11 @@ from core.ports.web_scraping_ports import (
 )
 from core.ports.data_ports import DataMapperPort
 from core.ports.repository_ports import RepositoryPort
-from core.ports.utility_ports import DateRangeCalculatorPort, LoggerPort
+from core.ports.utility_ports import (
+    DateRangeCalculatorPort,
+    LoggerPort,
+    TradingCalendarPort,
+)
 
 
 class CrawlerService:
@@ -35,6 +39,7 @@ class CrawlerService:
         repository: RepositoryPort,
         date_calculator: DateRangeCalculatorPort,
         logger: LoggerPort,
+        trading_calendar: TradingCalendarPort,
     ):
         # 모든 의존성을 생성자에서 받음 (명시적)
         self.page_provider = page_provider
@@ -44,6 +49,7 @@ class CrawlerService:
         self.repository = repository
         self.date_calculator = date_calculator
         self.logger = logger
+        self.trading_calendar = trading_calendar
 
     def run(self, start_year: int) -> Dict[int, pd.DataFrame]:
         """
@@ -130,11 +136,16 @@ class CrawlerService:
         # Page 객체 준비
         page = self.page_provider.get_page()
 
-        # 수집할 날짜 리스트 생성
-        target_dates = [
+        # 수집할 날짜 리스트 생성 (주말/공휴일 등 비거래일은 IPO 상장이 있을 수
+        # 없으므로 제외 - 캘린더 페이지 조회 자체를 건너뛰어 낭비 방지)
+        all_dates = [
             start_date + timedelta(days=i)
             for i in range(-days_back, days_ahead + 1)
         ]
+        target_dates = [d for d in all_dates if self.trading_calendar.is_trading_day(d)]
+        skipped = len(all_dates) - len(target_dates)
+        if skipped:
+            self.logger.info(f"[스케줄 크롤링] 비거래일 {skipped}일 제외")
 
         from collections import defaultdict
 

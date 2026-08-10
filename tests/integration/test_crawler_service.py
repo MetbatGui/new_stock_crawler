@@ -25,6 +25,7 @@ class TestCrawlerService:
             "repository": Mock(),  # data_exporter → repository
             "date_calculator": Mock(),
             "logger": Mock(),
+            "trading_calendar": Mock(is_trading_day=Mock(return_value=True)),
         }
 
     @pytest.fixture
@@ -40,6 +41,7 @@ class TestCrawlerService:
         assert crawler_service.data_mapper == mock_dependencies["data_mapper"]
         assert crawler_service.repository == mock_dependencies["repository"]
         assert crawler_service.logger == mock_dependencies["logger"]
+        assert crawler_service.trading_calendar == mock_dependencies["trading_calendar"]
 
     def test_run_with_single_year(self, crawler_service, mock_dependencies):
         """단일 연도 크롤링이 제대로 동작하는지 확인"""
@@ -198,6 +200,33 @@ class TestCrawlerService:
             for call in mock_dependencies["calendar_scraper"].scrape_calendar.call_args_list
         ]
         assert called_days == [19, 20, 21, 22, 23, 24, 25, 26]
+
+    def test_run_scheduled_skips_non_trading_days(
+        self, crawler_service, mock_dependencies
+    ):
+        """trading_calendar가 거래일이 아니라고 판단한 날은 scrape_calendar 자체를 호출하지 않아야 한다"""
+        mock_page = Mock()
+        mock_dependencies["page_provider"].get_page.return_value = mock_page
+
+        empty_report = ScrapeReport(
+            final_stock_count=0, spack_filtered_count=0, results=[]
+        )
+        mock_dependencies[
+            "calendar_scraper"
+        ].scrape_calendar.return_value = empty_report
+
+        # 2024-11-23(토), 2024-11-24(일)만 비거래일로 처리
+        def is_trading_day(d):
+            return d.weekday() < 5
+
+        mock_dependencies["trading_calendar"].is_trading_day.side_effect = is_trading_day
+
+        crawler_service.run_scheduled(
+            start_date=date(2024, 11, 22), days_ahead=2, days_back=0
+        )
+
+        # 11/22(금), 23(토), 24(일) 중 주말 2일 제외 -> 1회만 호출
+        assert mock_dependencies["calendar_scraper"].scrape_calendar.call_count == 1
 
 
 def _make_stock(name: str, listing_date: str) -> StockInfo:

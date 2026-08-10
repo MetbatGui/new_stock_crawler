@@ -10,6 +10,7 @@ from core.services.enrichment_service import EnrichmentService
 from core.services.crawl_orchestrator_service import CrawlOrchestratorService
 from infra.adapters.utils.console_logger import ConsoleLogger
 from infra.adapters.utils.date_calculator import DateCalculator
+from infra.adapters.utils.krx_trading_calendar import KrxTradingCalendar
 from infra.adapters.web.playwright_page_provider import PlaywrightPageProvider
 from infra.adapters.web.calendar_scraper_adapter import CalendarScraperAdapter
 from infra.adapters.web.detail_scraper_adapter import DetailScraperAdapter
@@ -31,6 +32,7 @@ def build_dependencies(headless: bool = True) -> Dict[str, Any]:
     # 1. 공통 유틸리티
     logger = ConsoleLogger()
     date_calculator = DateCalculator()
+    trading_calendar = KrxTradingCalendar()
 
     # 2. 데이터 어댑터
     krx_adapter = KrxNativeAdapter()
@@ -65,6 +67,7 @@ def build_dependencies(headless: bool = True) -> Dict[str, Any]:
         repository=repository,
         date_calculator=date_calculator,
         logger=logger,
+        trading_calendar=trading_calendar,
     )
 
     # 7. 오케스트레이터 (크롤링 + 가격 백필을 조합해 실행, Drive 동기화는 CLI가 별도 처리)
