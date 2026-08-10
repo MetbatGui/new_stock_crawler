@@ -58,17 +58,19 @@ class CrawlOrchestratorService:
         self,
         target_date: date,
         days_ahead: int = 3,
+        days_back: int = 7,
         today: Optional[date] = None,
     ) -> CrawlRunResult:
-        """당일+N일 크롤링 + 당해연도(1월이면 전년도 포함) 가격 백필
+        """과거 N일+당일+N일 크롤링 + 당해연도(1월이면 전년도 포함) 가격 백필
 
         Args:
-            target_date: 크롤링 시작 날짜
+            target_date: 크롤링 기준 날짜
             days_ahead: 향후 며칠까지 수집할지
+            days_back: 과거 며칠까지 재수집할지 (크론이 며칠 못 돈 경우 대비)
             today: 백필 대상 연도 판단 기준 (기본값 date.today(), 테스트용 주입 지점)
         """
         crawl_result = self.crawler.run_scheduled(
-            start_date=target_date, days_ahead=days_ahead
+            start_date=target_date, days_ahead=days_ahead, days_back=days_back
         )
         collected_count = sum(len(df) for df in crawl_result.values())
 

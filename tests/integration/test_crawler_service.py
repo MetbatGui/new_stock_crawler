@@ -173,6 +173,32 @@ class TestCrawlerService:
         assert result == {}
         mock_dependencies["repository"].save.assert_not_called()
 
+    def test_run_scheduled_covers_days_back_range(
+        self, crawler_service, mock_dependencies
+    ):
+        """days_back을 주면 과거 날짜도 scrape_calendar 대상에 포함되어야 한다"""
+        mock_page = Mock()
+        mock_dependencies["page_provider"].get_page.return_value = mock_page
+
+        empty_report = ScrapeReport(
+            final_stock_count=0, spack_filtered_count=0, results=[]
+        )
+        mock_dependencies[
+            "calendar_scraper"
+        ].scrape_calendar.return_value = empty_report
+
+        crawler_service.run_scheduled(
+            start_date=date(2024, 11, 26), days_ahead=0, days_back=7
+        )
+
+        # 과거 7일 + 당일 = 총 8회 호출
+        assert mock_dependencies["calendar_scraper"].scrape_calendar.call_count == 8
+        called_days = [
+            call.kwargs["today_day"]
+            for call in mock_dependencies["calendar_scraper"].scrape_calendar.call_args_list
+        ]
+        assert called_days == [19, 20, 21, 22, 23, 24, 25, 26]
+
 
 def _make_stock(name: str, listing_date: str) -> StockInfo:
     return StockInfo(

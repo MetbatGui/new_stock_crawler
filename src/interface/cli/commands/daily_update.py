@@ -27,7 +27,7 @@ def daily_update(
     """
     일일 업데이트 (스케줄 실행용 - docker-compose의 crawler-cron 서비스가 매일 호출)
 
-    당일 + 향후 3일의 IPO 데이터를 크롤링하여 SQLite 저장소(db/)에 upsert한 뒤,
+    과거 7일 + 당일 + 향후 3일의 IPO 데이터를 크롤링하여 SQLite 저장소(db/)에 upsert한 뒤,
     당해연도(1월이면 전년도까지) 데이터를 대상으로 OHLC 가격 백필을 수행합니다.
 
     Excel 내보내기: uv run crawler export-excel
@@ -49,12 +49,14 @@ def daily_update(
     try:
         deps["logger"].info("=" * 60)
         deps["logger"].info("📅 Stock Crawler - 일일 스케줄 업데이트")
-        deps["logger"].info(f"시작 날짜: {parsed_date}")
-        deps["logger"].info("수집 범위: 당일 + 3일 (총 4일)")
+        deps["logger"].info(f"기준 날짜: {parsed_date}")
+        deps["logger"].info("수집 범위: 과거 7일 + 당일 + 향후 3일 (총 11일)")
         deps["logger"].info("=" * 60)
 
         deps["page_provider"].setup()
-        result = deps["orchestrator"].run_daily(target_date=parsed_date, days_ahead=3)
+        result = deps["orchestrator"].run_daily(
+            target_date=parsed_date, days_ahead=3, days_back=7
+        )
 
         if result.collected_count:
             deps["logger"].info(f"✅ 총 {result.collected_count}건 SQLite 저장 완료")

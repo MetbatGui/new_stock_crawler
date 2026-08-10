@@ -108,28 +108,33 @@ class CrawlerService:
         return yearly_data
 
     def run_scheduled(
-        self, start_date: date, days_ahead: int = 3
+        self, start_date: date, days_ahead: int = 3, days_back: int = 0
     ) -> Dict[int, pd.DataFrame]:
         """
-        일일 스케줄 크롤링 (당일 + 향후 N일)
+        일일 스케줄 크롤링 (과거 N일 + 당일 + 향후 N일)
 
         Args:
-            start_date: 시작 날짜 (보통 오늘)
+            start_date: 기준 날짜 (보통 오늘)
             days_ahead: 향후 며칠까지 수집할지 (기본 3일)
+            days_back: 과거 며칠까지 재수집할지 (기본 0일 - 크론이 며칠 못 돈 경우
+                대비한 백필. upsert가 종목명 기준 dedup이라 중복 수집해도 안전함)
 
         Returns:
             연도별 DataFrame 딕셔너리
         """
 
         self.logger.info(
-            f"[스케줄 크롤링] {start_date} ~ {days_ahead}일 후까지 수집 시작"
+            f"[스케줄 크롤링] {start_date} 기준 -{days_back}일 ~ +{days_ahead}일 수집 시작"
         )
 
         # Page 객체 준비
         page = self.page_provider.get_page()
 
         # 수집할 날짜 리스트 생성
-        target_dates = [start_date + timedelta(days=i) for i in range(days_ahead + 1)]
+        target_dates = [
+            start_date + timedelta(days=i)
+            for i in range(-days_back, days_ahead + 1)
+        ]
 
         from collections import defaultdict
 
