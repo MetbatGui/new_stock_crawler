@@ -181,9 +181,27 @@ Dockerfile에서 `ENV PATH="/app/.venv/bin:$PATH"`로 가상환경을 PATH에 �
 **교훈:** Dockerfile의 `ENV`는 cron처럼 **자체적으로 새 환경을 구성해 잡을 스폰하는
 데몬** 안에서는 상속되지 않을 수 있음. cron 잡 스크립트는 PATH에 의존하지 말고
 절대경로로 실행할 것 — `docker build`만으로는 안 잡히고, 실제 스케줄이 발화되는 걸
-봐야 발견됨(2.6/3.5와 같은 종류의 함정).
+봐야 발견됨(2.6/3.6과 같은 종류의 함정).
 
-### 3.5 실제 배포로 검증
+### 3.5 같은 원인이 su 권한 축소 이후 Playwright도 깨뜨림
+
+3.3의 su 권한 축소를 적용한 뒤 실제 배포에서 `BrowserType.launch: Executable doesn't
+exist at /home/nonroot/.cache/ms-playwright/...` 오류가 새로 발생했습니다. 원인은
+3.4와 같은 뿌리: Dockerfile의 `ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`도 cron
+잡 프로세스에 상속되지 않아, Playwright가 지정된 경로 대신 nonroot의 기본 캐시 경로
+(`~/.cache/ms-playwright`)를 찾다 실패한 것. `run-crawl.sh`의 `su` 커맨드 문자열
+안에 `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`를 직접 명시해 해결 — cron/su의 환경
+상속 규칙을 이해하려 하기보다, 실제 실행되는 명령어 문자열에 필요한 값을 인라인으로
+박아 넣는 쪽이 더 확실하고 디버깅하기 쉬웠습니다.
+
+**교훈:** cron 잡 안에서 실행하는 프로세스가 (우리 앱 설정이 아니라) **서드파티
+라이브러리가 직접 읽는 OS 환경변수**에 의존한다면, "우리 config는 .env를 직접
+읽으니 env 상속이 필요 없다"는 판단이 그 라이브러리에는 적용되지 않음. Dockerfile에
+`ENV`로 박아둔 값이라도 cron 잡 안에서 실제로 보이는지 배포 후 반드시 확인할 것 —
+이번처럼 권한/PATH 문제를 하나 고치고 나면 그 다음 계층에서 같은 종류의 문제가 또
+나올 수 있음.
+
+### 3.6 실제 배포로 검증
 
 `docker build` → `docker run`으로 이미지 빌드/CLI 동작을 먼저 확인하고, `docker compose up
 -d crawler-cron`으로 실제 배포한 뒤:
@@ -229,6 +247,11 @@ Dockerfile에서 `ENV PATH="/app/.venv/bin:$PATH"`로 가상환경을 PATH에 �
     기동/fd 권한에만 root가 필요하면 `su`/`gosu`로 실제 페이로드는 nonroot로 내릴 것
     (fd는 `open()` 시점에만 권한 체크되므로 root가 먼저 열어둔 리다이렉션은 자식이
     nonroot여도 그대로 상속됨).
+14. **cron 잡이 실행하는 서드파티 라이브러리의 OS 환경변수 의존성도 확인할 것**:
+    "우리 config는 .env를 직접 읽으니 env 상속 불필요"는 우리 앱 코드에만 해당함.
+    Playwright의 `PLAYWRIGHT_BROWSERS_PATH`처럼 라이브러리가 OS 환경변수를 직접
+    읽는 경우, Dockerfile `ENV`로 박아둬도 cron 잡엔 안 물려가므로 실행 커맨드에
+    명시적으로 지정할 것.
 
 ---
 
