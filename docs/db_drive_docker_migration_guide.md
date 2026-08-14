@@ -278,7 +278,46 @@ krx의 `execute()`는 `None`을 반환하고 서비스 내부에서 로깅까지
 
 ---
 
-## 6. 아직 다루지 않은 것 (의도적으로 미룬 항목)
+## 6. weekly_gainers 포팅에서 드러난 이 프로젝트의 실제 버그
+
+같은 DB SSOT + Docker 패턴을 `weekly_gainers`에 포팅하면서(2026-08-14) 이 문서가 아직
+다루지 않은 문제 두 가지를 발견했습니다. 포팅 대상 프로젝트뿐 아니라 **이
+프로젝트(`new_stock_crawler`) 자체 코드에도 그대로 존재**하는 것으로 확인했습니다 —
+아직 수정하지 않았으니 다음 작업 때 반영할 것.
+
+### 6.1 ENV TZ=Asia/Seoul이 cron 잡에도, cron 데몬 스케줄링에도 반영 안 될 수 있음
+
+`Dockerfile`을 보면 `apt-get install tzdata` 이후 `ENV TZ=Asia/Seoul`만 설정하고
+`/etc/localtime` 심볼릭 링크는 갱신하지 않습니다. §3.4/3.5에서 이미 "Dockerfile의 ENV는
+cron 잡 프로세스에 상속되지 않는다"를 PATH/PLAYWRIGHT_BROWSERS_PATH로 겪었는데, TZ에는
+같은 체크리스트를 적용하지 않았습니다.
+
+이번엔 datetime 값이 어긋나는 정도로 끝나지 않습니다 - **cron 데몬(crond) 자체가
+crontab의 "50 15 * * 1-5" 같은 시각을 시스템 로컬타임(`/etc/localtime`) 기준으로
+해석**하므로, `/etc/localtime`이 기본값(Etc/UTC)에 머물러 있다면 실제 발화 시각이 의도한
+15:50 KST가 아니라 **15:50 UTC(= 다음날 새벽 00:50 KST)**일 수 있습니다. `docker exec ...
+date`로 컨테이너 내부 시각이 실제로 KST인지 직접 확인하기 전까지는 겉보기 crontab 설정만
+보고 안심하면 안 됩니다.
+
+**수정 방법**: `RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ >
+/etc/timezone`을 tzdata 설치 직후에 추가 - `TZ` 환경변수를 완전히 unset한 채로 `date`를
+실행해도 KST가 나오는지로 검증할 것(env 상속 여부와 무관하게 OS 레벨에 고정되므로).
+
+### 6.2 크롤링이 실패해도 last_crawl_date가 전진 — 갭 백필이 무력화될 수 있음
+
+`crawl_orchestrator_service.py`의 `run_daily()`가 `self.crawler.run_scheduled(...)` 호출의
+성공/실패와 무관하게 곧바로 `self.repository.set_last_crawl_date(target_date)`를
+호출합니다. weekly_gainers 포팅 중 코드 리뷰에서 발견한 것과 동일한 형태의 문제로,
+크롤링이 며칠간 실패해도(예: KRX/사이트 접속 장애) `last_crawl_date`는 계속 "오늘"로
+갱신되어, 다음 성공한 실행에서 공백이 실제보다 작게 보여 정작 실패했던 구간이 백필
+대상에서 빠집니다.
+
+**수정 방향**: `run_scheduled`가(또는 그 호출부가) 실제 수집 성공 여부를 반환하도록 하고,
+성공했을 때만 `set_last_crawl_date`를 호출할 것.
+
+---
+
+## 7. 아직 다루지 않은 것 (의도적으로 미룬 항목)
 
 - **GitHub Actions 등 외부 트리거 경로**: `daily_update.py`가 한때 "GitHub Actions용"으로
   설계됐었지만, 최종적으로는 krx와 동일하게 컨테이너 내장 cron으로 자체 호스팅하는
