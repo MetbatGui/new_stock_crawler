@@ -58,11 +58,8 @@ class SqliteRepository(RepositoryPort):
 
         # 기존 파일이 있으면 로드 후 병합
         existing = self.load(year)
-        combined = (
-            pd.concat([existing, df], ignore_index=True)
-            if not existing.empty
-            else df.copy()
-        )
+        frames = [d for d in (existing, df) if not d.empty and not d.isna().all().all()]
+        combined = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0].copy()
 
         # 종목명 단일 PK 기준 중복 제거 — 신규 우선
         pk_cols = [c for c in self._PK_COLS if c in combined.columns]
