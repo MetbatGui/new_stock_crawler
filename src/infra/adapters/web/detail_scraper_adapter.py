@@ -41,9 +41,16 @@ class DetailScraperAdapter(DetailScraperPort):
 
     def scrape_details(
         self, page: Page, stocks: List[Tuple[str, str]]
-    ) -> List[StockInfo]:
-        """여러 종목 스크래핑"""
+    ) -> Tuple[List[StockInfo], List[str]]:
+        """여러 종목 스크래핑.
+
+        Returns:
+            (성공한 종목 리스트, 실패한 종목명 리스트) - 실패 목록을 호출부가
+            알아야 last_crawl_date 같은 "이 배치가 완전히 끝났다"는 판단을
+            잘못 내리지 않음.
+        """
         results = []
+        failed_names = []
 
         for name, href in stocks:
             if stock := self._scrape_single(page, name, href):
@@ -52,9 +59,11 @@ class DetailScraperAdapter(DetailScraperPort):
                     self.logger.info(
                         f"   ✅ 수집 완료: {stock.name} (공모가: {stock.confirmed_price:,}원, 경쟁률: {stock.competition_rate})"
                     )
+            else:
+                failed_names.append(name)
             time.sleep(0.3)
 
-        return results
+        return results, failed_names
 
     def _scrape_single(self, page: Page, name: str, href: str) -> Optional[StockInfo]:
         """단일 종목 스크래핑"""

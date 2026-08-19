@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 
 from core.services.crawl_orchestrator_service import CrawlOrchestratorService
+from core.services.crawler_service import PartialScrapeFailureError
 
 
 @pytest.fixture
@@ -134,6 +135,25 @@ class TestRunDaily:
         orchestrator.run_daily(target_date=date(2024, 6, 1), today=date(2024, 6, 15))
 
         mock_repository.set_last_crawl_date.assert_called_once_with(date(2024, 6, 1))
+
+    def test_does_not_advance_last_crawl_date_on_partial_scrape_failure(
+        self, orchestrator, mock_crawler, mock_enrichment, mock_repository
+    ):
+        """일부 종목 상세 스크래핑이 실패하면 last_crawl_date를 전진시키지 않아야 한다
+        (다음 실행에서 이 구간이 자동으로 재시도되도록).
+        """
+        partial_data = {2024: pd.DataFrame({"종목명": ["주식A"]})}
+        mock_crawler.run_scheduled.side_effect = PartialScrapeFailureError(
+            "일부 실패", partial_data=partial_data, failed_names=["주식B"]
+        )
+        mock_enrichment.enrich_data.return_value = set()
+
+        result = orchestrator.run_daily(
+            target_date=date(2024, 6, 1), today=date(2024, 6, 15)
+        )
+
+        mock_repository.set_last_crawl_date.assert_not_called()
+        assert result.collected_count == 1
 
     def test_expands_days_back_when_gap_since_last_crawl_exceeds_default(
         self, orchestrator, mock_crawler, mock_enrichment, mock_repository

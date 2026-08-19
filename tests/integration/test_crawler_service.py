@@ -7,7 +7,7 @@ import pytest
 from unittest.mock import Mock
 from datetime import date
 
-from core.services.crawler_service import CrawlerService
+from core.services.crawler_service import CrawlerService, PartialScrapeFailureError
 from core.domain.models import ScrapeReport, StockInfo
 
 
@@ -61,7 +61,7 @@ class TestCrawlerService:
         mock_dependencies["calendar_scraper"].scrape_calendar.return_value = mock_report
 
         mock_stock = _make_stock("테스트종목", "2024-12-01")
-        mock_dependencies["detail_scraper"].scrape_details.return_value = [mock_stock]
+        mock_dependencies["detail_scraper"].scrape_details.return_value = ([mock_stock], [])
 
         import pandas as pd
 
@@ -114,9 +114,10 @@ class TestCrawlerService:
             spack_filtered_count=0,
             results=[("종목", "http://test.com")],
         )
-        mock_dependencies["detail_scraper"].scrape_details.return_value = [
-            Mock(spec=StockInfo)
-        ]
+        mock_dependencies["detail_scraper"].scrape_details.return_value = (
+            [Mock(spec=StockInfo)],
+            [],
+        )
 
         import pandas as pd
 
@@ -145,7 +146,7 @@ class TestCrawlerService:
         )
 
         mock_stock = _make_stock("종목", "2024-01-01")
-        mock_dependencies["detail_scraper"].scrape_details.return_value = [mock_stock]
+        mock_dependencies["detail_scraper"].scrape_details.return_value = ([mock_stock], [])
 
         import pandas as pd
 
@@ -227,6 +228,43 @@ class TestCrawlerService:
 
         # 11/22(금), 23(토), 24(일) 중 주말 2일 제외 -> 1회만 호출
         assert mock_dependencies["calendar_scraper"].scrape_calendar.call_count == 1
+
+    def test_run_scheduled_raises_partial_failure_but_still_saves_succeeded_data(
+        self, crawler_service, mock_dependencies
+    ):
+        """일부 종목 상세 스크래핑이 실패하면 PartialScrapeFailureError를 발생시키되,
+        성공한 데이터는 이미 저장되고 예외의 partial_data로도 함께 전달돼야 한다."""
+        mock_page = Mock()
+        mock_dependencies["page_provider"].get_page.return_value = mock_page
+
+        mock_dependencies[
+            "calendar_scraper"
+        ].scrape_calendar.return_value = ScrapeReport(
+            final_stock_count=2,
+            spack_filtered_count=0,
+            results=[("성공종목", "http://a"), ("실패종목", "http://b")],
+        )
+
+        mock_stock = _make_stock("성공종목", "2024-11-26")
+        mock_dependencies["detail_scraper"].scrape_details.return_value = (
+            [mock_stock],
+            ["실패종목"],
+        )
+
+        import pandas as pd
+
+        mock_df = pd.DataFrame([{"name": "성공종목"}])
+        mock_dependencies["data_mapper"].to_dataframe.return_value = mock_df
+
+        with pytest.raises(PartialScrapeFailureError) as exc_info:
+            crawler_service.run_scheduled(start_date=date(2024, 11, 26), days_ahead=0)
+
+        assert exc_info.value.failed_names == ["실패종목"]
+        assert 2024 in exc_info.value.partial_data
+        mock_dependencies["repository"].save.assert_called_once()
+        saved_year, saved_df = mock_dependencies["repository"].save.call_args.args
+        assert saved_year == 2024
+        pd.testing.assert_frame_equal(saved_df, mock_df)
 
 
 def _make_stock(name: str, listing_date: str) -> StockInfo:

@@ -62,6 +62,10 @@ class DetailScraperPort(ABC):
     @abstractmethod
     def scrape_details(
         self, page: Page, stocks: List[Tuple[str, str]]
-    ) -> List[StockInfo]:
-        """종목 상세 정보 추출"""
+    ) -> Tuple[List[StockInfo], List[str]]:
+        """종목 상세 정보 추출.
+
+        Returns:
+            (성공한 종목 리스트, 실패한 종목명 리스트)
+        """
         pass

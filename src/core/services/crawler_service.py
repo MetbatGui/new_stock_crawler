@@ -3,7 +3,7 @@
 """
 
 from datetime import date, timedelta
-from typing import Dict
+from typing import Dict, List
 import pandas as pd
 
 from core.ports.web_scraping_ports import (
@@ -18,6 +18,21 @@ from core.ports.utility_ports import (
     LoggerPort,
     TradingCalendarPort,
 )
+
+
+class PartialScrapeFailureError(Exception):
+    """run_scheduled() 도중 일부 종목의 상세 정보 스크래핑이 실패했을 때 발생.
+
+    이미 성공적으로 수집/저장된 데이터는 partial_data에 담아 호출부가 그대로
+    쓸 수 있게 한다 - 실패했다고 성공한 데이터까지 버릴 필요는 없음. 다만
+    "이 날짜 범위가 완전히 끝났다"는 판단(last_crawl_date 전진 등)은 호출부가
+    이 예외를 보고 보류해야 한다.
+    """
+
+    def __init__(self, message: str, partial_data: Dict[int, pd.DataFrame], failed_names: List[str]):
+        super().__init__(message)
+        self.partial_data = partial_data
+        self.failed_names = failed_names
 
 
 class CrawlerService:
@@ -92,9 +107,13 @@ class CrawlerService:
                 continue
 
             # 3-2. 상세 정보 수집
-            stock_details = self.detail_scraper.scrape_details(
+            stock_details, failed_names = self.detail_scraper.scrape_details(
                 page=page, stocks=report.results
             )
+            if failed_names:
+                self.logger.warning(
+                    f"[{year}년] 상세 정보 수집 실패 {len(failed_names)}건: {failed_names}"
+                )
 
             # 3-3. DataFrame 변환 (OHLC 보강은 EnrichmentService가 별도 백필 단계에서 수행)
             df = self.data_mapper.to_dataframe(stock_details)
@@ -151,6 +170,7 @@ class CrawlerService:
 
         year_frames: Dict[int, list] = defaultdict(list)
         total_collected = 0
+        all_failed_names: List[str] = []
 
         for target_date in target_dates:
             year = target_date.year
@@ -176,9 +196,14 @@ class CrawlerService:
             )
 
             # 상세 정보 수집
-            stock_details = self.detail_scraper.scrape_details(
+            stock_details, failed_names = self.detail_scraper.scrape_details(
                 page=page, stocks=report.results
             )
+            if failed_names:
+                self.logger.warning(
+                    f"[{target_date}] 상세 정보 수집 실패 {len(failed_names)}건: {failed_names}"
+                )
+                all_failed_names.extend(failed_names)
 
             # DataFrame 변환 (OHLC 보강은 EnrichmentService가 별도 백필 단계에서 수행)
             df = self.data_mapper.to_dataframe(stock_details)
@@ -198,5 +223,12 @@ class CrawlerService:
             self.logger.info(f"총 {total_collected}건 저장 완료")
         else:
             self.logger.info("수집된 데이터 없음")
+
+        if all_failed_names:
+            raise PartialScrapeFailureError(
+                f"상세 정보 수집 {len(all_failed_names)}건 실패: {all_failed_names}",
+                partial_data=yearly_data,
+                failed_names=all_failed_names,
+            )
 
         return yearly_data

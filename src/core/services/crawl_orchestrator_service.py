@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional, Set
 
-from core.services.crawler_service import CrawlerService
+from core.services.crawler_service import CrawlerService, PartialScrapeFailureError
 from core.services.enrichment_service import EnrichmentService
 from core.ports.repository_ports import RepositoryPort
 from core.ports.utility_ports import LoggerPort
@@ -80,11 +80,18 @@ class CrawlOrchestratorService:
                 )
                 days_back = gap_days
 
-        crawl_result = self.crawler.run_scheduled(
-            start_date=target_date, days_ahead=days_ahead, days_back=days_back
-        )
+        try:
+            crawl_result = self.crawler.run_scheduled(
+                start_date=target_date, days_ahead=days_ahead, days_back=days_back
+            )
+            self.repository.set_last_crawl_date(target_date)
+        except PartialScrapeFailureError as e:
+            self.logger.warning(
+                f"일부 종목 수집 실패({len(e.failed_names)}건)로 last_crawl_date를 "
+                f"전진시키지 않음 - 다음 실행에서 이 구간이 다시 수집됨: {e.failed_names}"
+            )
+            crawl_result = e.partial_data
         collected_count = sum(len(df) for df in crawl_result.values())
-        self.repository.set_last_crawl_date(target_date)
 
         # 당해연도(1월이면 전년도 포함) OHLC 가격 백필 — DB 상태 기준으로 누락분만 채움
         anchor = today or date.today()
