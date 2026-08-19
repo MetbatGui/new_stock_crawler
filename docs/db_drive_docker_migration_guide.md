@@ -369,8 +369,9 @@ krx의 `execute()`는 `None`을 반환하고 서비스 내부에서 로깅까지
 
 같은 DB SSOT + Docker 패턴을 `weekly_gainers`에 포팅하면서(2026-08-14) 이 문서가 아직
 다루지 않은 문제 두 가지를 발견했습니다. 포팅 대상 프로젝트뿐 아니라 **이
-프로젝트(`new_stock_crawler`) 자체 코드에도 그대로 존재**하는 것으로 확인했습니다 —
-이 문서 작성 시점 기준 아직 수정하지 않았으니 다음 작업 때 반영할 것.
+프로젝트(`new_stock_crawler`) 자체 코드에도 그대로 존재**하는 것으로 확인했습니다.
+**2026-08-19에 둘 다 수정 완료**(`crawler-cron` 재빌드/재기동까지 반영, 아래 각 절에
+수정 내용 기록).
 
 ### 6.1 ENV TZ=Asia/Seoul이 cron 잡에도, cron 데몬 스케줄링에도 반영 안 될 수 있음
 
@@ -390,6 +391,9 @@ date`로 컨테이너 내부 시각이 실제로 KST인지 직접 확인하기 �
 /etc/timezone`을 tzdata 설치 직후에 추가 - `TZ` 환경변수를 완전히 unset한 채로 `date`를
 실행해도 KST가 나오는지로 검증할 것(env 상속 여부와 무관하게 OS 레벨에 고정되므로).
 
+**수정 완료**(2026-08-19): 위 `RUN ln -snf ...` 라인을 `Dockerfile`에 추가하고,
+`docker exec ... sh -c "unset TZ; date"`로 KST가 나오는 것까지 실측 검증함.
+
 ### 6.2 크롤링이 실패해도 last_crawl_date가 전진 — 갭 백필이 무력화될 수 있음
 
 `crawl_orchestrator_service.py`의 `run_daily()`가 `self.crawler.run_scheduled(...)` 호출의
@@ -401,6 +405,15 @@ date`로 컨테이너 내부 시각이 실제로 KST인지 직접 확인하기 �
 
 **수정 방향**: `run_scheduled`가(또는 그 호출부가) 실제 수집 성공 여부를 반환하도록 하고,
 성공했을 때만 `set_last_crawl_date`를 호출할 것.
+
+**수정 완료**(2026-08-19): `DetailScraperAdapter.scrape_details`가 (성공 목록, 실패
+종목명 목록) 튜플을 반환하도록 바꾸고, `run_scheduled()`는 실패 종목이 하나라도 있으면
+`PartialScrapeFailureError`(성공분은 `partial_data`에 담아 전달)를 발생시키도록 함.
+`run_daily()`는 이 예외를 잡아 partial_data로 계속 진행하되 `set_last_crawl_date`는
+호출하지 않음 - 실패했던 구간은 다음 실행에서 자동 재시도됨. 재시도 정책(날짜 전체
+보류 vs 실패 종목만 별도 기록)은 두 가지 선택지 중 "날짜 전체 보류"를 프로젝트
+운영자가 선택해 반영함 - 전체 재수집은 종목명 upsert라 안전하다는 기존 전제(주석)를
+그대로 활용.
 
 ---
 
