@@ -47,6 +47,10 @@ daily date="":
 enrich:
     uv run crawler enrich --drive
 
+setup-release:
+    git checkout master
+    git remote add employers-new-stock https://github.com/guruta71/new-stock-crawler.git
+
 # Release to employers-new-stock
 # Usage: just release
 release:

@@ -39,6 +39,37 @@
    uv sync
    ```
 
+   `just init`으로 위 `uv sync`에 더해 `.env`/`secrets/` 생성까지 한 번에 처리할 수도 있습니다.
+
+3. **환경 변수 설정 (`.env`)**: `src/config.py`의 `Settings`가 읽는 값 기준입니다.
+
+   ```env
+   BASE_URL=http://www.38.co.kr
+   HEADLESS=True
+   DEFAULT_TIMEOUT=30000
+
+   GOOGLE_DRIVE_FOLDER_ID=your_folder_id_here
+   # GOOGLE_CLIENT_SECRET_FILE / GOOGLE_TOKEN_FILE은 기본값(secrets/client_secret.json,
+   # secrets/token.json)을 쓰면 되므로 보통 지정할 필요 없습니다.
+
+   LOG_LEVEL=INFO
+   ```
+
+4. **Google Drive 인증 (OAuth 2.0)**: `secrets/client_secret.json`(Google Cloud Console에서 발급받은
+   OAuth 클라이언트)을 넣고 최초 1회 인증합니다.
+
+   ```bash
+   uv run crawler auth   # 또는: just auth
+   ```
+
+   브라우저 로그인 후 `secrets/token.json`이 자동 생성됩니다.
+
+5. **인증/설정 점검**
+
+   ```bash
+   uv run crawler healthcheck   # 또는: just healthcheck
+   ```
+
 ## 💻 사용 방법
 
 모든 명령어는 `uv run crawler`를 통해 실행됩니다.
@@ -120,8 +151,8 @@ uv run crawler --help
    필요해 이 서비스만 `user: root`로 오버라이드되어 있습니다(다른 명령은 전부 `nonroot`로 실행).
 
 4. **필요한 볼륨/환경변수**: `output/`, `db/`, `secrets/`, `.env`를 호스트와 마운트합니다
-   (자세한 내용은 `docker-compose.yml` 참고). Google Drive 연동을 쓰려면 `secrets/client_secret.json`과
-   `uv run crawler auth`로 발급한 `secrets/token.json`이 필요합니다.
+   (자세한 내용은 `docker-compose.yml` 참고). `secrets/client_secret.json`·`secrets/token.json`은
+   호스트에서 `just auth`로 미리 발급해두면 컨테이너에서도 그대로 재사용됩니다.
 
 ## 📊 데이터 구조
 
@@ -144,3 +175,6 @@ uv run pytest
 # 커버리지 리포트 생성
 uv run pytest --cov=src --cov-report=html
 ```
+
+DB/Drive/Docker 마이그레이션 배경은 [docs/db_drive_docker_migration_guide.md](docs/db_drive_docker_migration_guide.md)를
+참고하세요.
