@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from unittest.mock import MagicMock, patch
 
-from interface.cli.drive_sync import sync_changed_years_to_drive
+from interface.cli.drive_sync import sync_changed_years_to_drive, sync_db_years_from_drive
 
 
 @pytest.fixture
@@ -110,3 +110,52 @@ class TestSyncChangedYearsToDrive:
             # 4번 모두 시도되어야 함 (2024 Excel 실패해도 2025 Excel, 두 연도 DB는 계속 진행)
             assert mock_storage.upload_file.call_count == 4
             mock_logger.error.assert_called()
+
+
+class TestSyncDbYearsFromDrive:
+    def test_downloads_matching_remote_files_overwriting_local(self, mock_logger, drive_env):
+        """로컬에 이미 2024.db가 있어도(drive_env가 미리 만들어둠) 원격에 파일이 있으면
+        항상 다시 받아 덮어써야 한다 - 로컬 불신 원칙(db_ssot_guide.md §6.2)."""
+        with patch("interface.cli.drive_sync.GoogleDriveAdapter") as mock_adapter_cls:
+            mock_storage = mock_adapter_cls.return_value
+            mock_storage.get_or_create_subfolder.return_value = "db_folder_id"
+            mock_storage.list_files.return_value = [{"id": "remote_2024_id", "name": "2024.db"}]
+            mock_storage.download_file.return_value = True
+
+            sync_db_years_from_drive({2024}, mock_logger)
+
+            mock_storage.download_file.assert_called_once()
+            call_args = mock_storage.download_file.call_args
+            assert call_args[0][0] == "remote_2024_id"
+
+    def test_year_not_on_remote_is_skipped_without_error(self, mock_logger, drive_env):
+        with patch("interface.cli.drive_sync.GoogleDriveAdapter") as mock_adapter_cls:
+            mock_storage = mock_adapter_cls.return_value
+            mock_storage.get_or_create_subfolder.return_value = "db_folder_id"
+            mock_storage.list_files.return_value = []
+
+            sync_db_years_from_drive({2026}, mock_logger)
+
+            mock_storage.download_file.assert_not_called()
+            mock_logger.error.assert_not_called()
+
+    def test_subfolder_failure_skips_download_without_raising(self, mock_logger, drive_env):
+        with patch("interface.cli.drive_sync.GoogleDriveAdapter") as mock_adapter_cls:
+            mock_storage = mock_adapter_cls.return_value
+            mock_storage.get_or_create_subfolder.return_value = None
+
+            sync_db_years_from_drive({2024}, mock_logger)
+
+            mock_storage.list_files.assert_not_called()
+            mock_logger.error.assert_called()
+
+    def test_download_failure_logs_warning_but_does_not_raise(self, mock_logger, drive_env):
+        with patch("interface.cli.drive_sync.GoogleDriveAdapter") as mock_adapter_cls:
+            mock_storage = mock_adapter_cls.return_value
+            mock_storage.get_or_create_subfolder.return_value = "db_folder_id"
+            mock_storage.list_files.return_value = [{"id": "remote_id", "name": "2024.db"}]
+            mock_storage.download_file.return_value = False
+
+            sync_db_years_from_drive({2024}, mock_logger)
+
+            mock_logger.warning.assert_called()
