@@ -64,13 +64,23 @@ def sync_db_years_from_drive(years: Iterable[int], logger: LoggerPort) -> None:
 
 def sync_changed_years_to_drive(
     repository: RepositoryPort, changed_years: Iterable[int], logger: LoggerPort
-) -> None:
+) -> bool:
+    """변경된 연도의 Excel/DB를 Drive로 업로드한다.
+
+    Returns:
+        bool: 모든 업로드가 성공했으면 True. 하나라도 실패하면 False - 호출부는 이 값이
+            False면 exit code를 0이 아닌 값으로 끝내야 한다(db_ssot_guide.md §6.2).
+            sync_db_years_from_drive()가 로컬을 항상 불신하고 매번 Drive로 덮어쓰므로,
+            업로드 실패를 조용히 넘기면 이번에 계산한 최신 데이터가 다음 실행에서
+            낡은 원격 사본에 덮어써져 사라질 수 있다.
+    """
     years: Set[int] = set(changed_years)
     if not years:
-        return
+        return True
 
     renderer = ExcelRenderer()
     storage = GoogleDriveAdapter()
+    all_succeeded = True
 
     # 1. Excel 먼저
     for year in sorted(years):
@@ -85,12 +95,13 @@ def sync_changed_years_to_drive(
             logger.info(f"   ☁️  [{year}년] Excel Drive 업로드 완료 (ID: {file_id})")
         else:
             logger.error(f"   ⚠️  [{year}년] Excel Drive 업로드 실패")
+            all_succeeded = False
 
     # 2. db/{year}.db 나중 (db 서브폴더로)
     db_folder_id = storage.get_or_create_subfolder("db")
     if db_folder_id is None:
         logger.error("   ⚠️  Google Drive db 서브폴더 조회/생성 실패 — DB 업로드 건너뜀")
-        return
+        return False
 
     for year in sorted(years):
         db_path = config.DB_DIR / f"{year}.db"
@@ -101,3 +112,6 @@ def sync_changed_years_to_drive(
             logger.info(f"   ☁️  [{year}년] DB Drive 업로드 완료 (ID: {file_id})")
         else:
             logger.error(f"   ⚠️  [{year}년] DB Drive 업로드 실패")
+            all_succeeded = False
+
+    return all_succeeded

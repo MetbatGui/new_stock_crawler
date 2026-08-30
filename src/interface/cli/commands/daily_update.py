@@ -46,6 +46,7 @@ def daily_update(
         parsed_date = date.today()
 
     deps = build_dependencies(headless=headless)
+    drive_sync_ok = True
 
     try:
         deps["logger"].info("=" * 60)
@@ -73,7 +74,7 @@ def daily_update(
             deps["logger"].info(
                 f"☁️  Drive 동기화 대상 연도: {sorted(result.changed_years)}"
             )
-            sync_changed_years_to_drive(
+            drive_sync_ok = sync_changed_years_to_drive(
                 deps["repository"], result.changed_years, deps["logger"]
             )
 
@@ -89,3 +90,9 @@ def daily_update(
     finally:
         deps["page_provider"].cleanup()
         deps["logger"].info("\n✅ 리소스 정리 완료")
+
+    if not drive_sync_ok:
+        # 로컬은 항상 불신의 대상이라(db_ssot_guide.md §6.2) 다음 실행이 Drive를 무조건
+        # 다시 받아 로컬을 덮어쓴다 - 지금 업로드 안 된 로컬 변경분은 그때 사라진다.
+        deps["logger"].error("❌ Drive 업로드 실패 - 다음 실행 전에 재시도 필요")
+        raise typer.Exit(code=1)

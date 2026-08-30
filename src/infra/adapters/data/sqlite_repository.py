@@ -74,6 +74,9 @@ class SqliteRepository(RepositoryPort):
         try:
             conn = sqlite3.connect(tmp_path)
             try:
+                # ponytail: 전체 rewrite 방식(db_ssot_guide.md §5 예외) - 연도별 상장
+                # 종목 수가 수백 건대라 pandas 병합/재작성이 SQL upsert보다 단순함.
+                # 연도별 행수가 수만 건 넘으면 SQL upsert(INSERT ... ON CONFLICT)로 전환할 것.
                 combined.to_sql(self.TABLE, conn, if_exists="replace", index=False)
                 conn.execute(
                     f"CREATE UNIQUE INDEX IF NOT EXISTS idx_{self.TABLE}_name "
