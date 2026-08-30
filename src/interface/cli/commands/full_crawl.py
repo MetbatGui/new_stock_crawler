@@ -6,7 +6,7 @@ import typer
 from datetime import date
 from config import config
 from interface.cli.dependencies import build_dependencies
-from interface.cli.drive_sync import sync_changed_years_to_drive
+from interface.cli.drive_sync import sync_changed_years_to_drive, sync_db_years_from_drive
 
 
 def full_crawl(
@@ -34,6 +34,11 @@ def full_crawl(
         deps["logger"].info(f"📅 기준 날짜: {date.today()}")
         deps["logger"].info(f"📆 크롤링 시작 연도: {start_year}년")
         deps["logger"].info("=" * 60)
+
+        if drive:
+            # 처리 시작 전에 Drive의 DB를 로컬로 먼저 받아온다 - 로컬 db/가 유실됐어도
+            # 자동으로 복구되게 함(db_ssot_guide.md §6).
+            sync_db_years_from_drive(range(start_year, date.today().year + 1), deps["logger"])
 
         deps["page_provider"].setup()
         result = deps["orchestrator"].run_full(start_year=start_year)

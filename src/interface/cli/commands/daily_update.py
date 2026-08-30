@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Optional
 from config import config
 from interface.cli.dependencies import build_dependencies
-from interface.cli.drive_sync import sync_changed_years_to_drive
+from interface.cli.drive_sync import sync_changed_years_to_drive, sync_db_years_from_drive
 
 
 def daily_update(
@@ -53,6 +53,11 @@ def daily_update(
         deps["logger"].info(f"기준 날짜: {parsed_date}")
         deps["logger"].info("수집 범위: 과거 7일(최소) + 당일 + 향후 3일")
         deps["logger"].info("=" * 60)
+
+        if drive:
+            # 처리 시작 전에 Drive의 DB를 로컬로 먼저 받아온다 - 로컬 db/가 유실됐어도
+            # 자동으로 복구되게 함(db_ssot_guide.md §6). 연도 경계 조회를 위해 전년도도.
+            sync_db_years_from_drive({parsed_date.year, parsed_date.year - 1}, deps["logger"])
 
         deps["page_provider"].setup()
         result = deps["orchestrator"].run_daily(
